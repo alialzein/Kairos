@@ -27,7 +27,7 @@ Copied from the specs; every task implicitly includes these.
 - Design tokens (`docs/06` §5): `--twin-bg #05070d` (light `#f4f6fb`), `--twin-particle #2f9bff`, `--twin-particle-deep #0a3d7a`, `--twin-core #ffb347`, `--twin-core-hot #ff7a1a`, `--twin-spine #ffd28a → #2f9bff`, `--twin-halo rgba(80,160,255,0.35)`, `--twin-offline #ff4d4d`.
 - Exit gate A0/B0 (`docs/11`): CI green; `docker compose up` (VPS profile) healthy; Vercel preview deploys; auth tests pass; privacy CI check proven; STATUS.md initialized.
 
-## Decisions made by this plan (Ali can override; see open questions in STATUS.md)
+## Decisions made by this plan (all accepted by Ali on 2026-09-03)
 
 | # | Decision | Why |
 |---|---|---|
@@ -79,7 +79,7 @@ scoop install sops age
 sops --version; age --version
 ```
 
-- [ ] **P5: Supabase account + project** (human): create a free project named `kairos` in the Supabase dashboard, region `eu-central-1` (Frankfurt; matches the Q10 recommendation). Note the project ref. Keys are read later with `supabase status` (local) and from the dashboard (cloud). The Supabase CLI itself is installed as a repo devDependency in Task 1 (`pnpm supabase …`).
+- [ ] **P5: Supabase account + project** (human): create a free project named `kairos` in the Supabase dashboard, region `eu-central-1` (Frankfurt; closest to the Hetzner Falkenstein VPS, ADR-0013). Note the project ref. Keys are read later with `supabase status` (local) and from the dashboard (cloud). The Supabase CLI itself is installed as a repo devDependency in Task 1 (`pnpm supabase …`).
 
 - [ ] **P6: Vercel account** (human): sign in at vercel.com with GitHub; the repo import happens in Task 11.
 
@@ -1057,7 +1057,7 @@ git commit -m "feat(services): scaffold brain/memory/voice/style/trainer with uv
 
 ---
 
-### Task 5 (0.3): Docker Compose — VPS profile and PC profile (local run; VPS deploy is blocked by Q10)
+### Task 5 (0.3): Docker Compose — VPS profile and PC profile (local run; the VPS deploy itself is Task 16)
 
 **Files:**
 - Create: `services/<name>/Dockerfile` and `services/<name>/.dockerignore` for all five services
@@ -1268,7 +1268,7 @@ git add -A
 git commit -m "feat(infra): Dockerfiles and compose VPS/PC profiles with caddy, redis, falkordb"
 ```
 
-**Deferred (blocked by Q10):** provisioning the VPS, pointing DNS, `SITE_ADDRESS=api.<domain>`, `docker compose up` on the host. Tracked in STATUS.md as `0.3-deploy`; steps in Task 16.
+**Deferred to Task 16 (needs Ali to provision the Hetzner server, ADR-0013):** pointing DNS, `SITE_ADDRESS=api.<domain>`, `docker compose up` on the host. Tracked in STATUS.md as `0.3-deploy`.
 
 ---
 
@@ -3799,7 +3799,7 @@ gh run list --branch main --limit 1        # latest CI on main: success
 Current phase: A1 / B5 (Phase 0 gate passed)
 Last session: <date> — Phase 0 complete: monorepo, 5 services, compose, supabase migration + RLS, auth, contracts, privacy rails, CI, otel+langfuse, persona skeleton, identity + rename
 Next: A1.1 (ingestion framework) · B5.1 (R3F/WebGPU canvas) — run /writing-plans for each
-Blockers: 0.3-deploy waits on Q10 answer (VPS provider/region)
+Blockers: 0.3-deploy (Task 16) until the Hetzner server is provisioned (ADR-0013)
 Gate history: A0/B0 ✅ <date> — CI run <url>, privacy proof <url>, preview <url>
 ```
 
@@ -3813,9 +3813,9 @@ git push
 
 ---
 
-### Task 16 (0.3-deploy, BLOCKED by Q10): VPS provisioning and first deploy
+### Task 16 (0.3-deploy): VPS provisioning and first deploy — Hetzner Falkenstein (Q10 resolved, ADR-0013)
 
-Written for the recommended answer (Hetzner, Falkenstein, CX32-class 4 vCPU / 8 GB / 80 GB). If Ali chooses DigitalOcean Frankfurt, only Step 1 changes.
+Q10 answer (2026-09-03): Hetzner Cloud, Falkenstein (fsn1), CX32-class 4 vCPU / 8 GB / 80 GB. Steps 1–2 are Ali's (console + root SSH); Steps 3–5 can be run by the agent over SSH once the `twin` user exists.
 
 - [ ] **Step 1 (human): create the server** — Hetzner Cloud console → Ubuntu 24.04, Falkenstein, 4 vCPU/8 GB, add Ali's SSH public key, enable backups. Note the IPv4. Create DNS `A api.<domain> → <ip>`.
 - [ ] **Step 2 (human, once):** `ssh root@<ip>` → `apt update && apt install -y docker.io docker-compose-v2 git ufw && ufw allow 22,80,443/tcp && ufw enable`; `adduser twin && usermod -aG docker twin`; install Tailscale (`curl -fsSL https://tailscale.com/install.sh | sh && tailscale up`) for the PC ↔ VPS link (used from Phase A4).

@@ -36,6 +36,6 @@ PC only (default) or also Supabase Storage (convenient, encrypted, but off-machi
 
 If no Arabic model: use the English phrase and test detection with your accent; if detection < 90%, consider openWakeWord with a custom-trained model from your recordings.
 
-## Q10 — VPS provider/region **[blocks Phase 0, task 0.3 deploy step only]**
+## Q10 — VPS provider/region — **RESOLVED: Hetzner Cloud, Falkenstein** (ADR-0013)
 
-Recommendation: Hetzner (Falkenstein/Helsinki) or DigitalOcean (Frankfurt); ~4 vCPU / 8 GB / 80 GB. Latency Lebanon ↔ Frankfurt ≈ 60–90 ms.
+Chosen 2026-09-03 from Hetzner (Falkenstein/Helsinki) and DigitalOcean (Frankfurt); CX32-class ~4 vCPU / 8 GB / 80 GB. Latency Lebanon ↔ Frankfurt ≈ 60–90 ms. Deploy steps: `docs/plans/phase-0.md` Task 16.
