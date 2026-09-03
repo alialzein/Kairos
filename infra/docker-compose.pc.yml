@@ -1,0 +1,22 @@
+name: twin-pc
+
+x-service: &service
+  restart: unless-stopped
+  env_file:
+    - path: ../.env
+      required: false
+
+services:
+  style:
+    <<: *service
+    build: ../services/style
+    environment: { SERVICE_NAME: style }
+    ports: ["8003:8003"]
+
+  trainer:
+    <<: *service
+    build: ../services/trainer
+    environment: { SERVICE_NAME: trainer }
+    ports: ["8004:8004"]
+    volumes:
+      - ../corpus:/corpus # LOCAL ONLY — never leaves this machine

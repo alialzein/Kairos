@@ -1,0 +1,22 @@
+{
+	# On the VPS set SITE_ADDRESS=api.<domain> in .env and Caddy obtains TLS automatically.
+	# Locally SITE_ADDRESS defaults to :80 (plain HTTP).
+}
+
+{$SITE_ADDRESS}
+
+handle_path /brain/* {
+	reverse_proxy brain:8000
+}
+
+handle_path /memory/* {
+	reverse_proxy memory:8001
+}
+
+handle_path /voice/* {
+	reverse_proxy voice:8002
+}
+
+handle {
+	respond "twin edge ok" 200
+}

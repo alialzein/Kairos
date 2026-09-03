@@ -1,0 +1,81 @@
+name: twin
+
+x-service: &service
+  restart: unless-stopped
+  env_file:
+    - path: ../.env
+      required: false
+  networks: [twin]
+
+services:
+  brain:
+    <<: *service
+    build: ../services/brain
+    environment:
+      SERVICE_NAME: brain
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis: { condition: service_healthy }
+
+  memory:
+    <<: *service
+    build: ../services/memory
+    environment:
+      SERVICE_NAME: memory
+      FALKORDB_URL: redis://falkordb:6379
+    depends_on:
+      falkordb: { condition: service_healthy }
+
+  voice:
+    <<: *service
+    build: ../services/voice
+    environment:
+      SERVICE_NAME: voice
+      BRAIN_URL: http://brain:8000
+    depends_on:
+      brain: { condition: service_healthy }
+
+  redis:
+    <<: *service
+    image: redis:8.4-alpine
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  falkordb:
+    <<: *service
+    image: falkordb/falkordb:v4.20.4
+    volumes: [falkordb_data:/var/lib/falkordb/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  caddy:
+    <<: *service
+    image: caddy:2.11-alpine
+    ports: ["80:80", "443:443"]
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      brain: { condition: service_healthy }
+      memory: { condition: service_healthy }
+      voice: { condition: service_healthy }
+
+networks:
+  twin: {}
+
+volumes:
+  redis_data: {}
+  falkordb_data: {}
+  caddy_data: {}
+  caddy_config: {}
