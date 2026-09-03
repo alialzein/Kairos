@@ -1,0 +1,3 @@
+#!/bin/sh
+# Second gate: nothing under corpus/ (except corpus/README.md) may be pushed (CLAUDE.md §3).
+pnpm --silent check:corpus --tracked || exit 1

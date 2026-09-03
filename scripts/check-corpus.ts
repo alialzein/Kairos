@@ -1,11 +1,11 @@
-import { offendingPaths, stagedPaths, trackedCorpusPaths } from "./lib/corpus-check.ts";
+import { offendingPaths, stagedPaths, trackedPaths } from "./lib/corpus-check.ts";
 
 const mode = process.argv[2];
 if (mode !== "--staged" && mode !== "--tracked") {
   console.error("usage: check-corpus --staged | --tracked");
   process.exit(2);
 }
-const paths = mode === "--staged" ? stagedPaths() : trackedCorpusPaths();
+const paths = mode === "--staged" ? stagedPaths() : trackedPaths();
 const bad = offendingPaths(paths);
 if (bad.length > 0) {
   console.error(
