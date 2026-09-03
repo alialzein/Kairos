@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* docs/06-avatar-spec.md §5 — light theme */
+:root {
+  --twin-bg: #f4f6fb;
+  --twin-fg: #0b1020;
+  --twin-particle: #2f9bff;
+  --twin-particle-deep: #0a3d7a;
+  --twin-core: #ffb347;
+  --twin-core-hot: #ff7a1a;
+  --twin-spine-from: #ffd28a;
+  --twin-spine-to: #2f9bff;
+  --twin-halo: rgba(80, 160, 255, 0.35);
+  --twin-offline: #ff4d4d;
+}
+
+/* dark theme (the Avatar reference) */
+[data-theme="dark"] {
+  --twin-bg: #05070d;
+  --twin-fg: #e6ecff;
+}
+
+@theme inline {
+  --color-twin-bg: var(--twin-bg);
+  --color-twin-fg: var(--twin-fg);
+  --color-twin-particle: var(--twin-particle);
+  --color-twin-particle-deep: var(--twin-particle-deep);
+  --color-twin-core: var(--twin-core);
+  --color-twin-core-hot: var(--twin-core-hot);
+  --color-twin-halo: var(--twin-halo);
+  --color-twin-offline: var(--twin-offline);
+}
+
+html,
+body {
+  background: var(--twin-bg);
+  color: var(--twin-fg);
+  min-height: 100%;
+}
