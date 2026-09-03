@@ -58,6 +58,23 @@ pnpm dev
 pnpm supabase start
 ```
 
+### First sign-in
+
+Magic-link sign-up is closed by default (`ALLOW_SIGNUP=false`), so the very first account has to be
+created deliberately:
+
+1. In `apps/web/.env.local`, set `ALLOW_SIGNUP=true`.
+2. Restart `pnpm --filter @twin/web dev`, go to http://localhost:3000/login, and sign in with your
+   email via the magic link.
+3. Promote yourself to owner in Studio (http://127.0.0.1:54323) — see `supabase/seed.sql` for the
+   `profiles` shape — then copy your `auth.users.id`.
+4. Put that id in `OWNER_USER_IDS` in `apps/web/.env.local`.
+5. Set `ALLOW_SIGNUP` back to `false` and restart dev.
+
+On a cloud project, also turn off "Enable email signups" under Authentication → Providers once the
+owner account exists — `ALLOW_SIGNUP` only gates the app's own `signInWithOtp` call, not the Supabase
+project setting.
+
 ## Ports
 
 | service | port |

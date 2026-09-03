@@ -1,8 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isPublicPath } from "@/lib/auth/public-paths";
 import { supabaseEnv } from "./env";
-
-const PUBLIC_PREFIXES = ["/login", "/auth"];
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request });
@@ -24,10 +23,8 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
 
   // getClaims() validates the JWT and refreshes the session cookie when needed.
   const { data } = await supabase.auth.getClaims();
-  const isPublic = PUBLIC_PREFIXES.some((p) => request.nextUrl.pathname.startsWith(p));
-  if (!data?.claims && !isPublic) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
+  if (!data?.claims && !isPublicPath(request.nextUrl.pathname)) {
+    const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
   return response;
