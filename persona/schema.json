@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://twin.local/persona/core.schema.json",
+  "title": "Persona Core (docs/04-identity-model.md §3)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meta",
+    "identity",
+    "background",
+    "values",
+    "decision_procedure",
+    "evaluation",
+    "opinions",
+    "relationships",
+    "current_context",
+    "routines_preferences",
+    "linguistic_profile",
+    "registers",
+    "boundaries",
+    "unknowns"
+  ],
+  "$defs": {
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sources": { "type": "array", "items": { "type": "string" } },
+    "leaf": {
+      "type": "object",
+      "properties": {
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "sources": { "$ref": "#/$defs/sources" },
+        "updated_at": { "type": "string", "format": "date" }
+      }
+    },
+    "stringList": { "type": "array", "items": { "type": "string" } }
+  },
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "twin_name", "updated_at"],
+      "properties": {
+        "version": { "type": "integer", "minimum": 1 },
+        "twin_name": { "type": "string", "minLength": 1 },
+        "updated_at": { "type": "string", "format": "date" }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "location", "languages", "roles"],
+      "properties": {
+        "name": { "type": "string" },
+        "age_bracket": { "type": "string" },
+        "location": { "type": "string" },
+        "languages": { "$ref": "#/$defs/stringList" },
+        "roles": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "background": {
+      "type": "array",
+      "items": {
+        "allOf": [{ "$ref": "#/$defs/leaf" }],
+        "type": "object",
+        "required": ["period", "fact"],
+        "properties": {
+          "period": { "type": "string" },
+          "fact": { "type": "string" },
+          "why_it_matters": { "type": "string" }
+        }
+      }
+    },
+    "values": {
+      "type": "array",
+      "items": {
+        "allOf": [{ "$ref": "#/$defs/leaf" }],
+        "type": "object",
+        "required": ["value", "rank"],
+        "properties": {
+          "value": { "type": "string" },
+          "rank": { "type": "integer", "minimum": 1 },
+          "evidence": { "type": "string" },
+          "tension_with": { "type": "string" }
+        }
+      }
+    },
+    "decision_procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_heuristics": { "$ref": "#/$defs/stringList" },
+        "risk_posture": { "type": "string" },
+        "speed_vs_quality": { "type": "string" },
+        "who_he_consults": { "$ref": "#/$defs/stringList" },
+        "what_triggers_escalation": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "what_impresses_him": { "$ref": "#/$defs/stringList" },
+        "what_annoys_him": { "$ref": "#/$defs/stringList" },
+        "quality_bar_examples": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "opinions": {
+      "type": "array",
+      "items": {
+        "allOf": [{ "$ref": "#/$defs/leaf" }],
+        "type": "object",
+        "required": ["topic", "stance", "confidence_1_5"],
+        "properties": {
+          "topic": { "type": "string" },
+          "stance": { "type": "string" },
+          "confidence_1_5": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "reasoning": { "type": "string" },
+          "as_of": { "type": "string", "format": "date" },
+          "stability": { "type": "string", "enum": ["stable", "drifting"] }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "allOf": [{ "$ref": "#/$defs/leaf" }],
+        "type": "object",
+        "required": ["id", "role"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^PERSON_[0-9]+$|^[A-Za-z ].*$" },
+          "role": { "type": "string" },
+          "how_ali_treats_them": { "type": "string" },
+          "register": { "type": "string", "enum": ["casual", "professional"] }
+        }
+      }
+    },
+    "current_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projects": { "$ref": "#/$defs/stringList" },
+        "active_conflicts": { "$ref": "#/$defs/stringList" },
+        "priorities_this_quarter": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "routines_preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "daily": { "type": "string" },
+        "food": { "type": "string" },
+        "gaming": { "type": "string" },
+        "tools": { "$ref": "#/$defs/stringList" },
+        "travel": { "type": "string" }
+      }
+    },
+    "linguistic_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "english": {
+          "type": "object",
+          "properties": {
+            "tone": { "type": "string" },
+            "sentence_length": { "type": "string" },
+            "formatting_habits": { "$ref": "#/$defs/stringList" },
+            "signature_phrases": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "arabic": {
+          "type": "object",
+          "properties": {
+            "dialect": { "type": "string" },
+            "script": { "type": "string", "enum": ["Arabic", "Arabizi", "both", "unknown"] },
+            "signature_phrases": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "code_switching": {
+          "type": "object",
+          "properties": {
+            "triggers": { "$ref": "#/$defs/stringList" },
+            "typical_ratio_casual": { "type": "string" },
+            "typical_ratio_professional": { "type": "string" }
+          }
+        },
+        "emoji_and_punctuation": { "type": "string" },
+        "cursing_threshold": { "type": "string" },
+        "humor_style": { "type": "string" }
+      }
+    },
+    "registers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["casual", "professional"],
+      "properties": {
+        "casual": {
+          "type": "object",
+          "required": ["description"],
+          "properties": {
+            "description": { "type": "string" },
+            "exemplar_ids": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "professional": {
+          "type": "object",
+          "required": ["description"],
+          "properties": {
+            "description": { "type": "string" },
+            "exemplar_ids": { "$ref": "#/$defs/stringList" }
+          }
+        }
+      }
+    },
+    "boundaries": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "unknowns": { "$ref": "#/$defs/stringList" }
+  }
+}
