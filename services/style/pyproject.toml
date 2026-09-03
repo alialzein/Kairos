@@ -1,0 +1,51 @@
+[project]
+name = "twin-style"
+version = "0.0.1"
+description = "TWIN style: serves the Style Engine (Qwen + Ali LoRA)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.141,<1",
+  "uvicorn[standard]>=0.52",
+  "pydantic>=2.13,<3",
+  "pydantic-settings>=2.15",
+  "prometheus-client>=0.26",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.1",
+  "pytest-asyncio>=1.4",
+  "httpx>=0.28",
+  "ruff>=0.16",
+  "mypy>=2.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "style"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "RUF"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+mypy_path = "src"
+explicit_package_bases = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["opentelemetry.*", "jsonschema.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
