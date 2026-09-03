@@ -38,3 +38,7 @@ Thumbs.db
 
 # agent scratch
 .superpowers/
+
+# raw corpus never enters git (docs/10 §1). Only the README is tracked.
+corpus/*
+!corpus/README.md

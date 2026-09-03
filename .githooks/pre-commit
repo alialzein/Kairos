@@ -1,0 +1,3 @@
+#!/bin/sh
+# Blocks commits that stage anything under corpus/ (except corpus/README.md).
+pnpm --silent check:corpus --staged || exit 1
