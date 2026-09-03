@@ -6,6 +6,7 @@ dist
 uv.lock
 pnpm-lock.yaml
 **/src/generated/**
+packages/config/src/identity.generated.ts
 supabase/.temp
 corpus
 .superpowers

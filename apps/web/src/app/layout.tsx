@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { identity } from "@twin/config";
 import "./globals.css";
 import { ThemeScript } from "@/components/theme-script";
 
 export const metadata: Metadata = {
-  title: "Kairos",
-  description: "Ali's digital self",
+  title: identity.twin_name,
+  description: `${identity.twin_name} — Ali's digital self`,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

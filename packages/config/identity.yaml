@@ -1,0 +1,16 @@
+# The persona's identity. Change it with: pnpm twin:rename <NewName>
+twin_name: Kairos
+wake_phrase:
+  en: Hey Kairos
+  ar: يا كايروس
+palette:
+  bg: "#05070d"
+  bg_light: "#f4f6fb"
+  particle: "#2f9bff"
+  particle_deep: "#0a3d7a"
+  core: "#ffb347"
+  core_hot: "#ff7a1a"
+  spine_from: "#ffd28a"
+  spine_to: "#2f9bff"
+  halo: "rgba(80,160,255,0.35)"
+  offline: "#ff4d4d"

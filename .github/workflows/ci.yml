@@ -52,7 +52,8 @@ jobs:
       - run: uv python install 3.12
       - run: pnpm install --frozen-lockfile
       - run: pnpm gen:api
-      - run: git diff --exit-code -- packages/shared/src/generated
+      - run: pnpm --filter @twin/config gen
+      - run: git diff --exit-code -- packages/shared/src/generated packages/config/src/identity.generated.ts
 
   docker:
     name: compose builds (VPS + PC profiles)
