@@ -1,0 +1,2 @@
+-- Local seed. After signing in once at http://localhost:3000/login, promote yourself:
+--   update public.profiles set role = 'owner' where id = '<your auth.users.id from Studio>';
