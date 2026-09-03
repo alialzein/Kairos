@@ -4,6 +4,11 @@ Keep field names identical to the zod schemas.
 """
 
 import warnings
+from enum import StrEnum
+from typing import Annotated, Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 # `register` is the spec-mandated field name (docs/08 §6); pydantic warns because ABCMeta.register
 # is reachable through BaseModel's metaclass. The name is safe — silence exactly this message.
@@ -12,12 +17,6 @@ warnings.filterwarnings(
     message=r'Field name "register" in "TurnRequest" shadows an attribute in parent',
     category=UserWarning,
 )
-
-from enum import StrEnum  # noqa: E402 - must follow the warnings filter above
-from typing import Annotated, Literal  # noqa: E402
-from uuid import UUID  # noqa: E402
-
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter  # noqa: E402
 
 
 class AvatarState(StrEnum):

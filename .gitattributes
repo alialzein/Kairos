@@ -1,0 +1,14 @@
+# Normalise line endings: git stores LF; working copies get LF on every platform (.editorconfig agrees).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.wav binary
+*.mp3 binary
+*.glb binary
+*.parquet binary

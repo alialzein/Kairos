@@ -7,7 +7,10 @@ mkdir -p "$OUT"
 (
   cd "$ROOT/services/brain"
   SUPABASE_JWT_SECRET="codegen-only-secret-with-32-characters!" \
-  uv run python -c 'import json; from brain.main import create_app; print(json.dumps(create_app().openapi(), indent=2))'
-) > "$OUT/brain.openapi.json"
+  uv run python -c 'import json, sys
+from brain.main import create_app
+with open(sys.argv[1], "w", encoding="utf-8", newline="\n") as f:
+    f.write(json.dumps(create_app().openapi(), indent=2) + "\n")' "$OUT/brain.openapi.json"
+)
 (cd "$ROOT" && pnpm exec openapi-typescript "$OUT/brain.openapi.json" -o "$OUT/brain.d.ts")
 echo "wrote $OUT/brain.openapi.json and brain.d.ts"
