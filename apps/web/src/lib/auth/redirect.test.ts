@@ -8,6 +8,14 @@ const MALICIOUS_INPUTS = [
   "//evil.com",
   "https://evil.com",
   "javascript:alert(1)",
+  "/.//evil.com",
+  "/..//evil.com",
+  "/././/evil.com",
+  "/a/..//evil.com",
+  "/%2e//evil.com",
+  "/.//evil.com/x",
+  "/.//./evil.com",
+  "/x/../..//evil.com",
 ];
 
 describe("safeNextPath", () => {
@@ -34,6 +42,11 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/\\evil.com")).toBe("/");
     expect(safeNextPath("/\\\\evil.com")).toBe("/");
     expect(safeNextPath("/\\/evil.com")).toBe("/");
+  });
+
+  it("rejects dot-segment paths that normalise into a //-prefixed (scheme-relative) pathname", () => {
+    expect(safeNextPath("/.//evil.com")).toBe("/");
+    expect(safeNextPath("/a/..//evil.com")).toBe("/");
   });
 
   it("never resolves off the app's own origin, even for malicious input", () => {

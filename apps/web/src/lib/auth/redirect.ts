@@ -10,6 +10,13 @@ export function safeNextPath(raw: string | null | undefined): string {
   } catch {
     return "/";
   }
-  if (url.origin !== SENTINEL_ORIGIN) return "/";
-  return `${url.pathname}${url.search}${url.hash}`;
+  if (url.origin !== SENTINEL_ORIGIN || url.pathname.startsWith("//")) return "/";
+  const result = `${url.pathname}${url.search}${url.hash}`;
+  // Re-parse exactly the way the call site will; any discrepancy means "/".
+  try {
+    if (new URL(result, SENTINEL_ORIGIN).origin !== SENTINEL_ORIGIN) return "/";
+  } catch {
+    return "/";
+  }
+  return result;
 }
