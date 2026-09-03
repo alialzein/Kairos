@@ -1,3 +1,4 @@
+import time
 from collections.abc import Callable
 
 import jwt
@@ -66,3 +67,19 @@ def test_verifier_es256_via_jwks(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_verifier_without_config_raises() -> None:
     with pytest.raises(RuntimeError):
         JwtVerifier(secret=None, jwks_url=None, audience="authenticated")
+
+
+def test_token_missing_sub_is_401(client: TestClient) -> None:
+    now = int(time.time())
+    payload = {"aud": "authenticated", "role": "authenticated", "exp": now + 600}
+    token = jwt.encode(payload, TEST_SECRET, algorithm="HS256")
+    r = client.get("/owner/ping", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+
+def test_expired_token_is_401(client: TestClient) -> None:
+    now = int(time.time())
+    payload = {"sub": OWNER_ID, "aud": "authenticated", "role": "authenticated", "exp": now - 10}
+    token = jwt.encode(payload, TEST_SECRET, algorithm="HS256")
+    r = client.get("/owner/ping", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401

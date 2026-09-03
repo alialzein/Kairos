@@ -10,6 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from brain.settings import Settings
 
 _bearer = HTTPBearer(auto_error=False)
+_REQUIRED_CLAIMS = ["sub", "exp", "aud"]
 
 
 @dataclass(frozen=True)
@@ -36,10 +37,22 @@ class JwtVerifier:
     def verify(self, token: str) -> Claims:
         if self._jwks is not None:
             key = self._signing_key_for(token).key
-            payload = jwt.decode(token, key, algorithms=["ES256", "RS256"], audience=self._audience)
+            payload = jwt.decode(
+                token,
+                key,
+                algorithms=["ES256", "RS256"],
+                audience=self._audience,
+                options={"require": _REQUIRED_CLAIMS},
+            )
         else:
             assert self._secret is not None
-            payload = jwt.decode(token, self._secret, algorithms=["HS256"], audience=self._audience)
+            payload = jwt.decode(
+                token,
+                self._secret,
+                algorithms=["HS256"],
+                audience=self._audience,
+                options={"require": _REQUIRED_CLAIMS},
+            )
         return Claims(
             sub=str(payload["sub"]),
             role=str(payload.get("role", "")),

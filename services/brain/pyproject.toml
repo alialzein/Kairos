@@ -44,6 +44,9 @@ mypy_path = "src"
 explicit_package_bases = true
 files = ["src", "tests"]
 
+[tool.pydantic-mypy]
+init_typed = true
+
 [[tool.mypy.overrides]]
 module = ["opentelemetry.*", "jsonschema.*"]
 ignore_missing_imports = true
