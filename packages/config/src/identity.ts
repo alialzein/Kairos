@@ -23,8 +23,10 @@ export const Identity = z.object({
 });
 export type Identity = z.infer<typeof Identity>;
 
-export const IDENTITY_PATH = fileURLToPath(new URL("../identity.yaml", import.meta.url));
+export function identityPath(): string {
+  return fileURLToPath(new URL("../identity.yaml", import.meta.url));
+}
 
-export function loadIdentity(filePath: string = IDENTITY_PATH): Identity {
+export function loadIdentity(filePath: string = identityPath()): Identity {
   return Identity.parse(parse(readFileSync(filePath, "utf8")));
 }
