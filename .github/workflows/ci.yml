@@ -28,7 +28,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: pnpm }
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.0.1
         with: { enable-cache: true }
       - run: uv python install 3.12
       - run: pnpm install --frozen-lockfile
@@ -48,7 +48,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: pnpm }
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.0.1
       - run: uv python install 3.12
       - run: pnpm install --frozen-lockfile
       - run: pnpm gen:api

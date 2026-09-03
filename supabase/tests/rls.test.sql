@@ -31,6 +31,7 @@ select is((select count(*) from public.episodes), 0::bigint, 'guest sees no memo
 select throws_ok(
   $$ insert into public.sessions (user_id, channel) values ('11111111-1111-1111-1111-111111111111', 'web') $$,
   '42501',
+  'new row violates row-level security policy for table "sessions"',
   'guest cannot create a session for another user');
 select lives_ok(
   $$ insert into public.sessions (user_id, channel) values ('22222222-2222-2222-2222-222222222222', 'guest') $$,
