@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { offendingPaths, stagedPaths, trackedPaths } from "./corpus-check";
+import { offendingPaths, rangePaths, stagedPaths, trackedPaths } from "./corpus-check";
 
 const dirs: string[] = [];
 
@@ -51,8 +51,14 @@ describe("offendingPaths", () => {
 
   it("flags everything under corpus/ regardless of case, and a bare corpus entry", () => {
     expect(
-      offendingPaths(["Corpus/raw/a.txt", "corpus", "corpus/readme.md", "corpus/README.md"]),
-    ).toEqual(["Corpus/raw/a.txt", "corpus", "corpus/readme.md"]);
+      offendingPaths([
+        "Corpus/raw/a.txt",
+        "corpus",
+        "Corpus",
+        "corpus/readme.md",
+        "corpus/README.md",
+      ]),
+    ).toEqual(["Corpus/raw/a.txt", "corpus", "Corpus", "corpus/readme.md"]);
   });
 });
 
@@ -78,5 +84,23 @@ describe("git-backed checks", () => {
     expect(offendingPaths(stagedPaths(dir))).toEqual(["corpus/raw/محادثات.txt"]);
     gitIn(dir, "commit", "-q", "-m", "oops2");
     expect(offendingPaths(trackedPaths(dir))).toEqual(["corpus/raw/محادثات.txt"]);
+  });
+
+  it("sees a corpus file introduced within a pushed range", () => {
+    const dir = tempRepo();
+    gitIn(dir, "add", "corpus/README.md");
+    gitIn(dir, "commit", "-q", "-m", "clean base");
+    gitIn(dir, "add", "-f", "corpus/raw/x.txt");
+    gitIn(dir, "commit", "-q", "-m", "oops");
+    expect(offendingPaths(rangePaths("HEAD~1..HEAD", dir))).toEqual(["corpus/raw/x.txt"]);
+  });
+
+  it("sees nothing in an empty range", () => {
+    const dir = tempRepo();
+    gitIn(dir, "add", "corpus/README.md");
+    gitIn(dir, "commit", "-q", "-m", "clean base");
+    gitIn(dir, "add", "-f", "corpus/raw/x.txt");
+    gitIn(dir, "commit", "-q", "-m", "oops");
+    expect(offendingPaths(rangePaths("HEAD..HEAD", dir))).toEqual([]);
   });
 });

@@ -1,0 +1,5 @@
+[
+  { "type": "avatar.state", "state": "IDLE", "extra": true },
+  { "type": "nope" },
+  { "type": "avatar.energy", "value": 2 }
+]

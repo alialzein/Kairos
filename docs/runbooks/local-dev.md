@@ -68,7 +68,9 @@ created deliberately:
    email via the magic link.
 3. Promote yourself to owner in Studio (http://127.0.0.1:54323) — see `supabase/seed.sql` for the
    `profiles` shape — then copy your `auth.users.id`.
-4. Put that id in `OWNER_USER_IDS` in `apps/web/.env.local`.
+4. Put that id in `OWNER_USER_IDS` in `apps/web/.env.local`; also set `OWNER_USER_IDS` in the
+   repo-root `.env` (the compose services read it from there), then
+   `docker compose -f infra/docker-compose.yml up -d`. Both must match.
 5. Set `ALLOW_SIGNUP` back to `false` and restart dev.
 
 On a cloud project, also turn off "Enable email signups" under Authentication → Providers once the

@@ -47,3 +47,11 @@ def test_turn_event_fixtures_roundtrip() -> None:
         dumped = TURN_EVENT_ADAPTER.dump_python(event, mode="json")
         assert dumped["type"] == raw["type"]
         assert TURN_EVENT_ADAPTER.validate_python(dumped) == event
+
+
+def test_invalid_turn_event_fixtures() -> None:
+    bad_events = _load("turn_events.invalid.json")
+    assert isinstance(bad_events, list)
+    for bad in bad_events:
+        with pytest.raises(ValidationError):
+            TURN_EVENT_ADAPTER.validate_python(bad)

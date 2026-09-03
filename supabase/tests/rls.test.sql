@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(9);
 
 -- two users: 1111… becomes owner, 2222… stays guest (profile rows come from the trigger)
 insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -36,6 +36,14 @@ select throws_ok(
 select lives_ok(
   $$ insert into public.sessions (user_id, channel) values ('22222222-2222-2222-2222-222222222222', 'guest') $$,
   'guest can create own session');
+-- a guest cannot promote themselves (no update policy on profiles → 0 rows affected, no error)
+update public.profiles set role = 'owner' where id = '22222222-2222-2222-2222-222222222222';
+select is((select role from public.profiles where id = '22222222-2222-2222-2222-222222222222'), 'guest', 'guest cannot self-promote to owner');
+reset role;
+
+-- anonymous requests see nothing
+set local role anon;
+select is((select count(*) from public.sessions), 0::bigint, 'anon sees no sessions');
 reset role;
 
 select * from finish();

@@ -32,4 +32,9 @@ describe("contracts", () => {
       expect(parsed.type).toBe(ev.type);
     }
   });
+  it("rejects every invalid TurnEvent fixture", () => {
+    for (const bad of fixture("turn_events.invalid.json") as unknown[]) {
+      expect(TurnEvent.safeParse(bad).success).toBe(false);
+    }
+  });
 });

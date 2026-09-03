@@ -1,5 +1,6 @@
 """TWIN brain: orchestrator (Reasoner + Style Engine + memory)."""
 
+import logging
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Response
@@ -19,6 +20,7 @@ def create_app(
     settings: Settings | None = None, span_processor: SpanProcessor | None = None
 ) -> FastAPI:
     settings = settings or Settings()
+    logging.getLogger("brain").info("owner allowlist: %d id(s)", len(settings.owner_user_ids))
     app = FastAPI(title=f"twin-{SERVICE_NAME}", version="0.0.1")
     app.state.settings = settings
     app.state.verifier = JwtVerifier(

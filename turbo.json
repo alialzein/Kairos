@@ -1,5 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": ["packages/shared/fixtures/**", "persona/**", ".env.example"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

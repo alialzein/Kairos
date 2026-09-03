@@ -5,7 +5,10 @@ const ALLOWED = "corpus/README.md";
 export function offendingPaths(paths: string[]): string[] {
   return paths
     .map((p) => p.replaceAll("\\", "/"))
-    .filter((p) => (p === "corpus" || p.toLowerCase().startsWith("corpus/")) && p !== ALLOWED);
+    .filter((p) => {
+      const lower = p.toLowerCase();
+      return (lower === "corpus" || lower.startsWith("corpus/")) && p !== ALLOWED;
+    });
 }
 
 function git(cwd: string, args: string[]): string[] {
@@ -18,4 +21,8 @@ export function stagedPaths(cwd: string = process.cwd()): string[] {
 
 export function trackedPaths(cwd: string = process.cwd()): string[] {
   return git(cwd, ["ls-files", "-z"]);
+}
+
+export function rangePaths(range: string, cwd: string = process.cwd()): string[] {
+  return git(cwd, ["diff", "--name-only", "--diff-filter=ACMRT", "-z", range]);
 }

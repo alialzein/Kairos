@@ -83,3 +83,10 @@ def test_expired_token_is_401(client: TestClient) -> None:
     token = jwt.encode(payload, TEST_SECRET, algorithm="HS256")
     r = client.get("/owner/ping", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 401
+
+
+def test_token_missing_exp_is_401(client: TestClient) -> None:
+    payload = {"sub": OWNER_ID, "aud": "authenticated", "role": "authenticated"}
+    token = jwt.encode(payload, TEST_SECRET, algorithm="HS256")
+    r = client.get("/owner/ping", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
