@@ -31,11 +31,11 @@ describe("offendingPaths", () => {
 });
 
 describe("git-backed checks", () => {
-  it("sees a staged raw file, and no tracked offenders before commit", () => {
+  it("sees a staged raw file as both staged and tracked", () => {
     const dir = tempRepo();
     execFileSync("git", ["add", "-f", "corpus/README.md", "corpus/raw/x.txt"], { cwd: dir });
     expect(offendingPaths(stagedPaths(dir))).toEqual(["corpus/raw/x.txt"]);
-    expect(offendingPaths(trackedCorpusPaths(dir))).toEqual([]);
+    expect(offendingPaths(trackedCorpusPaths(dir))).toEqual(["corpus/raw/x.txt"]);
   });
   it("sees a tracked raw file after commit", () => {
     const dir = tempRepo();

@@ -1,10 +1,24 @@
 [
-  { "type": "turn.start", "turn_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d", "session_id": "3f2b4c1e-8a7d-4c5e-9b1a-2d3e4f5a6b7c" },
+  {
+    "type": "turn.start",
+    "turn_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d",
+    "session_id": "3f2b4c1e-8a7d-4c5e-9b1a-2d3e4f5a6b7c"
+  },
   { "type": "avatar.state", "state": "THINKING" },
   { "type": "turn.delta", "turn_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d", "text": "يلا، " },
   { "type": "avatar.energy", "value": 0.42 },
-  { "type": "memory.candidate", "candidate_id": "5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f", "kind": "fact", "summary": "Ali prefers shipping small" },
-  { "type": "turn.end", "turn_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d", "style_applied": false, "latency_ms": { "assemble": 12, "reason": 400 } },
+  {
+    "type": "memory.candidate",
+    "candidate_id": "5c6d7e8f-9a0b-4c1d-8e2f-3a4b5c6d7e8f",
+    "kind": "fact",
+    "summary": "Ali prefers shipping small"
+  },
+  {
+    "type": "turn.end",
+    "turn_id": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d",
+    "style_applied": false,
+    "latency_ms": { "assemble": 12, "reason": 400 }
+  },
   { "type": "avatar.state", "state": "IDLE" },
   { "type": "error", "code": "provider_down", "message": "Reasoner unavailable" }
 ]

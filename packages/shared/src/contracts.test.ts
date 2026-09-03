@@ -8,7 +8,15 @@ const fixture = (name: string): unknown =>
 
 describe("contracts", () => {
   it("has the seven avatar states from CONTEXT.md", () => {
-    expect(AvatarState.options).toEqual(["DORMANT", "IDLE", "WAKING", "LISTENING", "THINKING", "SPEAKING", "OFFLINE"]);
+    expect(AvatarState.options).toEqual([
+      "DORMANT",
+      "IDLE",
+      "WAKING",
+      "LISTENING",
+      "THINKING",
+      "SPEAKING",
+      "OFFLINE",
+    ]);
   });
   it("accepts the valid TurnRequest fixture", () => {
     expect(TurnRequest.safeParse(fixture("turn_request.valid.json")).success).toBe(true);

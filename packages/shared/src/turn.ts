@@ -26,7 +26,12 @@ export const TurnEvent = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("avatar.state"), state: AvatarState }),
   z.object({ type: z.literal("avatar.energy"), value: z.number().min(0).max(1) }),
-  z.object({ type: z.literal("memory.candidate"), candidate_id: z.uuid(), kind: z.string(), summary: z.string() }),
+  z.object({
+    type: z.literal("memory.candidate"),
+    candidate_id: z.uuid(),
+    kind: z.string(),
+    summary: z.string(),
+  }),
   z.object({ type: z.literal("error"), code: z.string(), message: z.string() }),
 ]);
 export type TurnEvent = z.infer<typeof TurnEvent>;
