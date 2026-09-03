@@ -55,10 +55,168 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/turn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn */
+        post: operations["turn_turn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** AvatarEnergy */
+        AvatarEnergy: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "avatar.energy";
+            /** Value */
+            value: number;
+        };
+        /**
+         * AvatarState
+         * @enum {string}
+         */
+        AvatarState: "DORMANT" | "IDLE" | "WAKING" | "LISTENING" | "THINKING" | "SPEAKING" | "OFFLINE";
+        /** AvatarStateEvent */
+        AvatarStateEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "avatar.state";
+            state: components["schemas"]["AvatarState"];
+        };
+        /** ErrorEvent */
+        ErrorEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error";
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /** MemoryCandidateEvent */
+        MemoryCandidateEvent: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "memory.candidate";
+            /**
+             * Candidate Id
+             * Format: uuid
+             */
+            candidate_id: string;
+            /** Kind */
+            kind: string;
+            /** Summary */
+            summary: string;
+        };
+        /** TurnDelta */
+        TurnDelta: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.delta";
+            /**
+             * Turn Id
+             * Format: uuid
+             */
+            turn_id: string;
+            /** Text */
+            text: string;
+        };
+        /** TurnEnd */
+        TurnEnd: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.end";
+            /**
+             * Turn Id
+             * Format: uuid
+             */
+            turn_id: string;
+            /** Style Applied */
+            style_applied: boolean;
+            /** Latency Ms */
+            latency_ms: {
+                [key: string]: number;
+            };
+        };
+        /** TurnRequest */
+        TurnRequest: {
+            /** Text */
+            text: string;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "web" | "voice" | "mobile" | "guest";
+            /** Register */
+            register?: ("casual" | "professional") | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
+        /** TurnStart */
+        TurnStart: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "turn.start";
+            /**
+             * Turn Id
+             * Format: uuid
+             */
+            turn_id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -127,6 +285,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    turn_turn_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TurnRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": (components["schemas"]["TurnStart"] | components["schemas"]["TurnDelta"] | components["schemas"]["TurnEnd"] | components["schemas"]["AvatarStateEvent"] | components["schemas"]["AvatarEnergy"] | components["schemas"]["MemoryCandidateEvent"] | components["schemas"]["ErrorEvent"])[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
