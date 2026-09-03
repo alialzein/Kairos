@@ -17,6 +17,8 @@ export function renameTwin(root: string, newName: string): { changed: string[] }
   const identityPath = join(root, IDENTITY);
   const identity = parseDocument(readFileSync(identityPath, "utf8"));
   const oldName = String(identity.get("twin_name"));
+  if (!NAME.test(oldName))
+    throw new Error(`identity.yaml twin_name "${oldName}" is not a valid twin name (${NAME})`);
   identity.set("twin_name", newName);
   identity.setIn(["wake_phrase", "en"], `Hey ${newName}`);
   writeFileSync(identityPath, identity.toString());
@@ -32,7 +34,8 @@ export function renameTwin(root: string, newName: string): { changed: string[] }
   // prompt template — whole-word replacement of the old name
   const promptPath = join(root, PROMPT);
   const prompt = readFileSync(promptPath, "utf8");
-  const replaced = prompt.replace(new RegExp(`\\b${oldName}\\b`, "g"), newName);
+  const escaped = oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const replaced = prompt.replace(new RegExp(`\\b${escaped}\\b`, "g"), newName);
   if (replaced !== prompt) {
     writeFileSync(promptPath, replaced);
     changed.push(PROMPT);

@@ -14,7 +14,7 @@ function fakeRepo(): string {
   );
   writeFileSync(
     join(root, "persona", "core.yaml"),
-    "meta: { version: 1, twin_name: Kairos, updated_at: 2026-09-03 }\nidentity:\n  name: Ali Alzein\n",
+    'meta: { version: 1, twin_name: Kairos, updated_at: "2026-09-03" }\nidentity:\n  name: Ali Alzein\n',
   );
   writeFileSync(
     join(root, "persona", "prompts", "reasoner_system.md"),
@@ -39,7 +39,9 @@ describe("renameTwin", () => {
     expect(identity).toContain("twin_name: Astra");
     expect(identity).toContain("en: Hey Astra");
     expect(identity).toContain("ar: يا كايروس"); // Arabic rendering is a human decision
-    expect(readFileSync(join(root, "persona", "core.yaml"), "utf8")).toContain("twin_name: Astra");
+    const core = readFileSync(join(root, "persona", "core.yaml"), "utf8");
+    expect(core).toContain("twin_name: Astra");
+    expect(core).toContain('updated_at: "2026-09-03"'); // date stays quoted
     const prompt = readFileSync(join(root, "persona", "prompts", "reasoner_system.md"), "utf8");
     expect(prompt).toContain("You are Astra, the digital self");
     expect(prompt).toContain("Astra never lies");
@@ -48,5 +50,13 @@ describe("renameTwin", () => {
   it("rejects names that are not a single capitalised word", () => {
     expect(() => renameTwin(fakeRepo(), "two words")).toThrow();
     expect(() => renameTwin(fakeRepo(), "")).toThrow();
+  });
+  it("rejects an invalid existing name in identity.yaml", () => {
+    const root = fakeRepo();
+    writeFileSync(
+      join(root, "packages", "config", "identity.yaml"),
+      '# keep me\ntwin_name: "Kai.ros"\nwake_phrase:\n  en: Hey Kairos\n  ar: يا كايروس\npalette:\n  bg: "#05070d"\n',
+    );
+    expect(() => renameTwin(root, "Astra")).toThrow();
   });
 });
