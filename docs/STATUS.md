@@ -1,6 +1,6 @@
 # STATUS
-Current phase: A0 / B-
-Last session: 2026-09-03 — repo initialized and pushed to github.com/alialzein/Kairos; mattpocock skills + superpowers installed; Phase 0 plan (`docs/plans/phase-0.md`) approved by Ali, decisions D1–D10 accepted; Q10 resolved → Hetzner Falkenstein (ADR-0013); execution started at Task 1
-Next: 0.1 (plan Task 1: root workspace) → Task 2 → …; Tasks 5, 6, 11-local, 12 need Docker Desktop on Ali's machine (plan prerequisite P3) before they can be verified locally
-Blockers: Docker Desktop not installed on the dev laptop (human step P3); VPS provisioning (Task 16) is a human step
-Gate history: —
+Current phase: A0 / B0 — Phase 0 implementation complete; exit gate A0/B0 passed on the automated items, two human items pending (see Blockers)
+Last session: 2026-09-03 — all Phase 0 tasks 0.1–0.11 implemented via `docs/plans/phase-0.md` (Tasks 1–14 + final review fix wave), 30 commits on `main`, CI green on every push since Task 11; rulings and evidence in `docs/reports/phase-0-execution.md`
+Next: Ali's human steps below, then Task 16 (Hetzner deploy, ADR-0013) → Phase A1.1 (ingestion framework) and B5.1 (R3F/WebGPU canvas) with `/writing-plans` for each
+Blockers: (1) Docker Desktop not installed on the dev laptop (plan P3) — local `docker compose up`, `supabase start`/`test db`, the magic-link login flow and the Langfuse trace check have only been run in CI, not locally; (2) Vercel project import (plan Task 11 Step 2) not done — "Vercel preview deploys" has no evidence yet; (3) Supabase cloud link/push (Task 6 Step 7) and the first owner sign-in (`ALLOW_SIGNUP=true` once; see `docs/runbooks/local-dev.md`) are pending
+Gate history: A0/B0 ✅ (automated items) 2026-09-03 — CI green https://github.com/alialzein/Kairos/actions/runs/33782973057 (privacy, lint/typecheck/test/build, codegen drift, compose build + healthy stack, migration + pgTAP 9/9); privacy proof (job red on a tracked corpus file) https://github.com/alialzein/Kairos/actions/runs/33760172580 ; auth tests: brain 24 passed (401/200/403 + claims/ES256/expiry), web 13 passed; STATUS.md initialized. Pending human evidence: Vercel preview URL, local `docker compose ps` all healthy.
