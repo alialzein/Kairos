@@ -17,3 +17,72 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:corpus --tracked
+
+  checks:
+    name: lint · typecheck · test · build (TS + Python)
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_JWT_SECRET: ci-only-secret-with-at-least-32-characters!!
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: pnpm }
+      - uses: astral-sh/setup-uv@v10
+        with: { enable-cache: true }
+      - run: uv python install 3.12
+      - run: pnpm install --frozen-lockfile
+      - name: sync python services (locked)
+        run: for d in services/*/; do (cd "$d" && uv sync --locked); done
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  codegen:
+    name: generated API client is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: pnpm }
+      - uses: astral-sh/setup-uv@v10
+      - run: uv python install 3.12
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gen:api
+      - run: git diff --exit-code -- packages/shared/src/generated
+
+  docker:
+    name: compose builds (VPS + PC profiles)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - run: docker compose -f infra/docker-compose.yml config -q
+      - run: docker compose -f infra/docker-compose.pc.yml config -q
+      - run: docker compose -f infra/docker-compose.yml build
+      - run: docker compose -f infra/docker-compose.pc.yml build
+      - name: throwaway env for the compose run (brain fails closed without a JWT secret)
+        run: printf 'SUPABASE_JWT_SECRET=ci-only-secret-with-at-least-32-characters!!\nSITE_ADDRESS=:80\n' > .env
+      - name: VPS profile comes up healthy
+        run: |
+          docker compose -f infra/docker-compose.yml up -d --wait
+          curl -fsS http://localhost/brain/health
+          curl -fsS http://localhost/memory/health
+          curl -fsS http://localhost/voice/health
+          docker compose -f infra/docker-compose.yml down -v
+
+  supabase:
+    name: migration applies · RLS pgTAP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with: { version: latest }
+      - run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+      - run: supabase db reset
+      - run: supabase test db
+      - if: always()
+        run: supabase stop --no-backup
