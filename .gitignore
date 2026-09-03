@@ -1,0 +1,39 @@
+# deps / builds
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+secrets.enc.yaml.dec
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# os / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# git line-ending noise on Windows
+*.orig
+
+# agent scratch
+.superpowers/

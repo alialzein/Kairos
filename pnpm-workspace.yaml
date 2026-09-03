@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+  - services/*
+
+# pnpm 11 refuses to run dependency build scripts unless allowed here (strictDepBuilds).
+allowBuilds:
+  supabase: true # downloads the CLI binary in postinstall
+  "@tailwindcss/oxide": true
+  sharp: true
+  esbuild: true
+  unrs-resolver: true
