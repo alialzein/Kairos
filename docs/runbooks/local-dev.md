@@ -7,6 +7,26 @@
 
 ## Services in a container (VPS profile: brain, memory, voice, redis, falkordb, caddy)
 
+### Prerequisite: `.env` with a JWT secret
+
+Before running `up -d --build --wait` below, create `.env` and set a JWT secret:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+```bash
+cp .env.example .env
+```
+
+Then set `SUPABASE_JWT_SECRET` in `.env` to the value `pnpm supabase status` prints as "JWT secret" —
+or, if Supabase isn't running, to any string of at least 32 characters (brain only needs *a* secret to
+start; tokens are only minted once Supabase is actually running).
+
+`brain` refuses to start without `SUPABASE_JWT_SECRET` or `SUPABASE_JWKS_URL` by design (fail closed),
+and `voice`/`caddy` both wait for `brain` to report healthy, so an empty `.env` here means the whole
+VPS profile never comes up. CI provides its own throwaway secret in the docker job.
+
 ```powershell
 docker compose -f infra/docker-compose.yml config -q     # exit 0, no output
 docker compose -f infra/docker-compose.pc.yml config -q   # exit 0
