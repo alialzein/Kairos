@@ -10,6 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.114.0",
     "@twin/config": "workspace:*",
     "@twin/shared": "workspace:*",
     "next": "^16.3.4",
