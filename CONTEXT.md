@@ -39,3 +39,6 @@ Terms are used exactly as defined here, in code, docs, and conversation. Add a t
 | **Stage** | Where the Twin runs, selected by `.env` values and never by code: Home stage or Cloud stage (ADR-0014). |
 | **Home stage** | The first version: every component on Ali's gaming PC, local Reasoner, no paid service, zero egress. |
 | **Cloud stage** | Vercel + Supabase cloud + VPS with a frontier Reasoner, per ADR-0008/0013. Reached by roadmap Phase C. |
+| **Tier** | The Avatar quality level chosen per device: Ultra, High, Mid or Low (particle count, waves, bloom, target fps). Decided by device signals plus a 2-second frame probe. |
+| **Bench page** | `/bench/avatar`: a public page that renders only the Avatar canvas, driven by query parameters, used by the perf and E2E tests. Shows no persona or user data. |
+| **Demo turn** | A synthetic Turn (canned reply text + synthetic energy) that drives the Avatar through THINKING → SPEAKING → IDLE until the Brain's `/turn` exists (Phase A2). |

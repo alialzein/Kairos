@@ -22,9 +22,9 @@ Home stage: `REASONER_PROVIDER=ollama`, `REASONER_MODEL=qwen3.5:9b` (alternative
 
 When you write Arabic casually, is it Arabic script or Latin letters (Arabizi, "kifak")? Both? The Twin should mirror what you actually do. Recommendation: whatever your exports show; the labeler will report the ratio and you confirm.
 
-## Q6 — Light theme for the Avatar **[blocks Phase B5, task B5.7]**
+## Q6 — Light theme for the Avatar — **RESOLVED: (c) Avatar always dark; light theme for dashboard pages only (2026-09-04)**
 
-Dark background is the reference. For the light theme: (a) keep the Avatar dark inside a framed panel, (b) invert the palette on a light field, (c) light theme only for dashboard pages, Avatar always dark. Recommendation: (c) — particle bloom on white looks weak.
+The avatar section carries `data-theme="dark"` so the tokens under it are always the dark set; dashboard chrome follows the toggle. Plan: `docs/plans/phase-b5.md` Task 8.
 
 ## Q7 — Where interview audio lives **[blocks Phase A1, task A1.7]**
 

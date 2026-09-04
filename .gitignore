@@ -42,3 +42,8 @@ Thumbs.db
 # raw corpus never enters git (docs/10 §1). Only the README is tracked.
 corpus/*
 !corpus/README.md
+
+# playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/
