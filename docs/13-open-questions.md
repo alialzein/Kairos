@@ -6,17 +6,17 @@ Tagged with the phase they block. The agent asks **only** the questions blocking
 
 Chosen from: Astra, Kairos, Elara, Sirius, Aether, Orion, Kael. Wake phrase "Hey Kairos" (كايروس). Phase 0 task 0.11 sets `TWIN_NAME = "Kairos"`.
 
-## Q2 — GPU **[blocks Phase A4]**
+## Q2 — GPU — **RESOLVED: RTX 5070 12 GB GDDR7, 32 GB DDR5 (2026-09-04, ADR-0014)**
 
-Which GPU and VRAM is in your PC? ≥ 12 GB → train 7–8B QLoRA locally. 8 GB → train on a rented GPU (a few dollars per run), serve locally at 4-bit. Recommendation: tell the agent the exact card; it writes the ADR.
+≥ 12 GB → 7–8B QLoRA trains locally on the PC; serving at 4-bit alongside a 9B Reasoner needs scheduling (A4.1's ADR writes the VRAM plan; Blackwell/sm_120 needs CUDA 12.8+ builds of torch and Unsloth). Rented GPUs are not needed; free notebooks are not allowed (derived corpus would leave the machine).
 
 ## Q3 — Chat exports **[blocks nothing; improves A1/A4]**
 
 You did not select WhatsApp/Telegram. Casual chats are the best *style* corpus. Are you willing to export selected WhatsApp chats (e.g. with 3–5 close contacts, with their informal consent)? Recommendation: yes, at least a few; they materially improve lexical fidelity in Arabic.
 
-## Q4 — Reasoner provider order **[blocks Phase A2, task A2.5 — ADR-0003]**
+## Q4 — Reasoner provider order — **RESOLVED for the home stage: Ollama local, `qwen3.5:9b` (2026-09-04, ADR-0014)**; cloud order **[blocks Phase C, task C.4]**
 
-Primary + fallback frontier LLMs for the Brain (e.g. Claude latest as primary, OpenAI as fallback, or the reverse). Recommendation: primary = whichever API you already have credits/keys for and that handles Arabic well in your own tests; fallback = the other. The provider layer is abstracted; switching is config.
+Home stage: `REASONER_PROVIDER=ollama`, `REASONER_MODEL=qwen3.5:9b` (alternative `qwen3:14b`). Cloud stage: primary + fallback frontier LLMs (e.g. Claude latest as primary, OpenAI as fallback, or the reverse) decided by ADR in Phase C. Recommendation then: primary = whichever API you already have credits/keys for and that handles Arabic well in your own tests; fallback = the other. The provider layer is abstracted; switching is config.
 
 ## Q5 — Arabic script vs Arabizi **[blocks Phase A2]**
 

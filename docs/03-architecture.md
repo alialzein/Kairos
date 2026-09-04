@@ -1,6 +1,26 @@
 # 03 — Architecture
 
-## 1. Topology (where things run)
+## 0. Stages (ADR-0014)
+
+The Twin runs in one of two **stages**, selected by `.env` values only. The **home stage** is the first version: everything on Ali's gaming PC, a local Reasoner, no paid service, zero egress. The **cloud stage** (roadmap Phase C) is the topology in §1. Code is identical in both.
+
+```
+┌──────────── Ali's gaming PC · Windows 11 · RTX 5070 12 GB · 32 GB DDR5 ────────────┐
+│  laptop / phone ──LAN (Tailscale optional)──▶ apps/web  `next dev -H 0.0.0.0` :3000 │
+│                                                   │ HTTP + SSE, Supabase JWT        │
+│  Docker Desktop (WSL2 backend)                    ▼                                 │
+│   compose: caddy :80 ─▶ brain :8000 · memory :8001 · voice :8002 · redis · falkordb │
+│   pc profile: style :8003 · trainer :8004 (CUDA)   obs profile: langfuse :3001      │
+│   supabase local (CLI): api :54321 · db :54322 · studio :54323 · mailpit :54324     │
+│  Ollama (native Windows, CUDA) :11434 ◀── brain (host.docker.internal) / trainer    │
+│     Reasoner: qwen3.5:9b (alt qwen3:14b) · embeddings: bge-m3                       │
+│  corpus/ raw + derived — LOCAL ONLY                                                 │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Home-stage rules: the Reasoner is the local Ollama model (ADR-0002/0003 amended for this stage); the Style Engine and trainer run on the same GPU; availability equals PC uptime; the laptop is for coding only. Moving to the cloud stage is Phase C in `docs/11-roadmap.md`.
+
+## 1. Topology — cloud stage (where things run after Phase C)
 
 ```
 ┌───────────────────────── Vercel ─────────────────────────┐
@@ -98,6 +118,7 @@ input (text | transcript)
 
 ## 6. Infra
 
+- **Home stage (ADR-0014, now)**: one machine, the gaming PC — Docker Desktop (WSL2) runs the compose stack with the `pc` and `obs` profiles, the Supabase CLI runs the local data plane, Ollama runs natively on CUDA, `pnpm dev` serves the web app on the LAN. Setup: `docs/runbooks/local-dev.md` → "Home stage on the gaming PC". The bullets below describe the cloud stage (Phase C).
 - **Vercel**: Next.js, env vars for public API base, LiveKit URL.
 - **VPS** (Hetzner/DO 4 vCPU 8 GB): Docker Compose: brain, memory, voice, redis, falkordb, caddy (TLS), optional livekit-server. Backups: nightly `pg_dump` (Supabase handles), FalkorDB RDB snapshot to object storage.
 - **Supabase**: Postgres + pgvector + Auth + Storage (interview audio, if Ali opts in; otherwise audio stays on PC).
@@ -113,3 +134,5 @@ input (text | transcript)
 | Memory service down | Brain answers with Persona Core only; warns in UI; no memory writes (queued in Redis). |
 | STT/TTS provider down | Voice session falls back to text; Avatar shows OFFLINE ripple. |
 | PC offline at nightly window | Reflection runs on VPS (no GPU needed); training skipped and rescheduled. |
+| PC off or asleep (home stage) | Everything is down by design; availability equals PC uptime until Phase C. |
+| Ollama down or model not pulled (home stage) | brain `/health` reports the Reasoner unavailable; `/turn` emits a typed `error` event; UI shows OFFLINE. |

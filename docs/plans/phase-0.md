@@ -3815,6 +3815,8 @@ git push
 
 ### Task 16 (0.3-deploy): VPS provisioning and first deploy — Hetzner Falkenstein (Q10 resolved, ADR-0013)
 
+> Deferred to roadmap Phase C task C.3 by ADR-0014 (2026-09-04): the first version runs in the home stage on Ali's PC. The steps below stay valid for the cloud move.
+
 Q10 answer (2026-09-03): Hetzner Cloud, Falkenstein (fsn1), CX32-class 4 vCPU / 8 GB / 80 GB. Steps 1–2 are Ali's (console + root SSH); Steps 3–5 can be run by the agent over SSH once the `twin` user exists.
 
 - [ ] **Step 1 (human): create the server** — Hetzner Cloud console → Ubuntu 24.04, Falkenstein, 4 vCPU/8 GB, add Ali's SSH public key, enable backups. Note the IPv4. Create DNS `A api.<domain> → <ip>`.

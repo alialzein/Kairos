@@ -1,5 +1,51 @@
 # Local dev runbook
 
+## Home stage on the gaming PC (ADR-0014)
+
+The first version runs entirely on the PC (Windows 11, RTX 5070 12 GB, 32 GB RAM): web, services,
+Supabase local and the Reasoner. Nothing is paid and nothing leaves the machine. The laptop is for
+coding only: push to `main`, then on the PC `git pull` and restart what changed.
+
+### One-time setup (PC)
+
+1. Current NVIDIA Game Ready driver.
+2. Docker Desktop with the WSL2 backend (free for personal use). Check: `docker run --rm hello-world`.
+3. Ollama for Windows, latest release (RTX 50-series / Blackwell needs a recent build). Set a user
+   environment variable `OLLAMA_HOST=0.0.0.0:11434` (so containers can reach it) and restart Ollama, then:
+
+   ```powershell
+   ollama pull qwen3.5:9b
+   ollama run qwen3.5:9b "Say hi in Arabic and English"   # streams fast
+   ollama ps                                               # PROCESSOR column shows 100% GPU, not CPU
+   ```
+
+   Alternatives: `qwen3:14b` (9 GB, tighter fit with context); experiment only: `qwen3.5:35b` (MoE,
+   24 GB, spills into RAM). Change `REASONER_MODEL` in `.env` to switch.
+4. Node 24 (`corepack enable` provides pnpm 11), `uv`, Git.
+5. `git clone https://github.com/alialzein/Kairos.git` then `pnpm install --frozen-lockfile`.
+6. `.env` from `.env.example` (see "Prerequisite" below): `SUPABASE_JWT_SECRET` from `pnpm supabase status`,
+   the reasoner block as shipped (`REASONER_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://host.docker.internal:11434`),
+   `OWNER_USER_IDS` after the first sign-in.
+7. Windows Firewall: allow inbound TCP 3000, 54321 and 80 on the Private profile if the laptop or the
+   phone should reach the PC.
+
+### Run
+
+```powershell
+pnpm supabase start
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.obs.yml --profile obs up -d --build --wait   # drop the obs parts to skip Langfuse
+pnpm --filter @twin/web exec next dev -H 0.0.0.0                                                               # reachable from the LAN
+```
+
+From the laptop open `http://<pc-ip>:3000`. For magic links to work from the laptop, set
+`NEXT_PUBLIC_SITE_URL=http://<pc-ip>:3000` and `NEXT_PUBLIC_SUPABASE_URL=http://<pc-ip>:54321` in
+`apps/web/.env.local`, and add `http://<pc-ip>:3000/auth/confirm` to `additional_redirect_urls` in
+`supabase/config.toml`. Off-LAN access later: Tailscale (free personal plan) on both machines, same
+URLs with the Tailscale IP.
+
+Acceptance (paste into `docs/STATUS.md` gate history): `docker compose ps` all healthy,
+`pnpm supabase test db` green, `ollama ps` shows the model on the GPU, first owner sign-in from the laptop.
+
 ## Windows
 
 `pnpm gen:api` needs Git Bash on PATH ahead of the WSL launcher; until then run

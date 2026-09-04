@@ -4,6 +4,8 @@ Two tracks run in parallel after Phase 0. **Track A — Mind** (identity, brain,
 
 Each task lists: files to create/touch · tests · done-when. The agent expands tasks into 2–5 minute steps with `/writing-plans` before coding.
 
+**Stages (ADR-0014).** Phases 0 → A4 and B5 run in the *home stage*: everything on Ali's gaming PC, local Reasoner via Ollama, no paid service. **Phase C — Cloud move** (below, after Track B) is the switch to Vercel + Supabase cloud + VPS; it can start any time after A2 and is recommended after A4.
+
 `docs/STATUS.md` template:
 
 ```
@@ -35,7 +37,7 @@ Goal: an empty but fully wired monorepo where every service runs, tests pass, CI
 | 0.10 | Docs hygiene: `docs/STATUS.md`, `docs/plans/`, ADR template, `persona/` folder with empty `core.yaml` skeleton from `04-identity-model.md` §3 | `docs/STATUS.md`, `docs/adr/0000-template.md`, `persona/core.yaml` | Files exist; `core.yaml` validates against `persona/schema.json` |
 | 0.11 | `identity.yaml` with `TWIN_NAME = Kairos`, wake phrase "Hey Kairos", palette; a `pnpm twin:rename <name>` script that updates all references | `packages/config/identity.yaml`, `scripts/rename.ts` | Script run changes name in web title, prompt template, and wake config |
 
-**Exit gate A0/B0**: CI green; `docker compose up` (VPS profile) healthy; Vercel preview deploys; auth tests pass; privacy CI check proven; STATUS.md initialized.
+**Exit gate A0/B0**: CI green; `docker compose up` (VPS profile) healthy on the PC; auth tests pass; privacy CI check proven; STATUS.md initialized. *("Vercel preview deploys" moved to Phase C task C.1 by ADR-0014.)*
 
 ---
 
@@ -70,12 +72,12 @@ Goal: text chat with the Twin that already feels like Ali using Persona Core + S
 | A2.2 | Review UI: proposal diff viewer, accept/edit/reject per leaf; merge → `core.yaml` v1 + changelog | `apps/web/src/app/(owner)/persona/*`, `services/memory/src/memory/persona_api.py` | Ali approves v1 |
 | A2.3 | Persona prompt renderer (compact ≤ 2.5k tokens) + register/language directives | `services/brain/src/brain/persona_prompt.py` | Token budget test; snapshot test |
 | A2.4 | Style Exemplar index: embed + upload allowlisted `exemplars.jsonl` → `style_exemplars`; retrieval API | `services/trainer/.../exemplars/upload.py`, `services/memory/.../exemplars.py` | Retrieval returns register/language-filtered top-k in < 80 ms |
-| A2.5 | Brain `/turn` (SSE): context assembly (Persona Core + working memory + exemplars), Reasoner streaming, memory-candidate extraction stub, provider abstraction with fallback order | `services/brain/src/brain/{turn,context,providers/*}.py` | Integration test with mocked provider; latency spans |
+| A2.5 | Brain `/turn` (SSE): context assembly (Persona Core + working memory + exemplars), Reasoner streaming, memory-candidate extraction stub, provider abstraction — `ollama` provider first (home stage, ADR-0014; `REASONER_PROVIDER`, `OLLAMA_BASE_URL`, `REASONER_MODEL`); frontier providers with fallback order arrive in Phase C behind the same interface | `services/brain/src/brain/{turn,context,providers/*}.py` | Integration test with mocked provider; latency spans; `/health` reports Reasoner availability |
 | A2.6 | Chat UI (owner): streaming, session list, feedback buttons, provenance panel ("why"), lite-mode badge | `apps/web/src/app/(owner)/chat/*` | E2E Playwright: send → streamed reply → feedback stored |
-| A2.7 | Twin Eval v1: item bank loader, runner (config matrix), LLM-judge with rubrics, Fidelity computation, dashboard radar | `services/trainer/src/trainer/eval/*`, `apps/web/src/app/(owner)/eval/*` | First run recorded; smoke subset wired into CI |
+| A2.7 | Twin Eval v1: item bank loader, runner (config matrix), LLM-judge with rubrics (the local model in the home stage; every score records `judge`), Fidelity computation, dashboard radar | `services/trainer/src/trainer/eval/*`, `apps/web/src/app/(owner)/eval/*` | First run recorded; smoke subset wired into CI |
 | A2.8 | Ali's test-retest: re-answer 60 held-out items two weeks after interviews | — | `ali_answer_retest` populated |
 
-**Exit gate A2**: Fidelity ≥ 0.70 on `reasoner+exemplars`; chat p50 first-token ≤ 1.5 s; Persona Core v1 approved; CI eval smoke passing.
+**Exit gate A2**: Fidelity ≥ 0.70 on `reasoner+exemplars` (local judge, ADR-0014; re-measured with a frontier judge in Phase C task C.6); chat p50 first-token ≤ 1.5 s; Persona Core v1 approved; CI eval smoke passing.
 
 ### Phase A3 — Living Memory (~2 weeks)
 
@@ -95,7 +97,7 @@ Goal: text chat with the Twin that already feels like Ali using Persona Core + S
 
 | ID | Task | Files | Done-when |
 |---|---|---|---|
-| A4.1 | ADR: base model + VRAM plan (local vs rented training) | `docs/adr/00xx-style-base-model.md` | Accepted |
+| A4.1 | ADR: base model + VRAM plan — Q2 resolved: RTX 5070 12 GB, train locally (Blackwell/sm_120 needs CUDA 12.8+ builds of torch and Unsloth) | `docs/adr/00xx-style-base-model.md` | Accepted |
 | A4.2 | Dataset builder: mix rewrite/reply, balance registers/languages, 10% holdout, dataset hash | `services/trainer/src/trainer/train/dataset.py` | Stats report; hash in `training_runs` |
 | A4.3 | QLoRA training script (Unsloth + TRL), config YAML, resumable, nightly-schedulable, logs to `training_runs` | `services/trainer/src/trainer/train/{sft,config}.py`, `configs/sft_v1.yaml` | Adapter produced; eval loss curve saved |
 | A4.4 | Style service: serve base+adapter (vLLM or Ollama), `/v1/chat/completions`, health endpoint, Tailscale-only | `services/style/*` | Rewrite call p50 ≤ 300 ms for 40 tokens |
@@ -106,6 +108,8 @@ Goal: text chat with the Twin that already feels like Ali using Persona Core + S
 **Exit gate A4**: Fidelity ≥ 0.80 with style pass; lexical/syntactic axes improve ≥ 15% over A2; blind test ≥ 35%; no latency regression beyond +300 ms first token.
 
 ### Phase A6 — Voice (~2–3 weeks) *(numbered to align with the overall order; B5 runs before it)*
+
+Home-stage note (ADR-0014): A6.1's bake-off also measures the free local stack on the PC's GPU — faster-whisper (large-v3-turbo) STT, Piper/Kokoro TTS, F5-TTS/XTTS-v2 for the clone (`docs/07` §4.2 fallback), self-hosted `livekit-server` in compose. Paid voice vendors (ADR-0006, Deepgram, LiveKit Cloud) are cloud-stage choices confirmed by ADR at A6.1.
 
 | ID | Task | Files | Done-when |
 |---|---|---|---|
@@ -163,9 +167,27 @@ Goal: text chat with the Twin that already feels like Ali using Persona Core + S
 
 ---
 
+## Phase C — Cloud move (ADR-0014; any time after A2, recommended after A4)
+
+Goal: the proven home-stage Twin runs in the cloud stage (ADR-0008, ADR-0013) with a frontier Reasoner, without code changes beyond the provider layer.
+
+| ID | Task | Files | Done-when |
+|---|---|---|---|
+| C.1 | Vercel project import (`apps/web`), env vars, preview on PRs — steps in `docs/plans/phase-0.md` Task 11 Step 2 | — | Preview URL renders `/login` |
+| C.2 | Supabase cloud project: `supabase link` + `db push`; redirect allowlist; email signups off once the owner exists; services switch to `SUPABASE_JWKS_URL` | `supabase/config.toml`, `.env` | Migration applied; pgTAP green against the linked project |
+| C.3 | VPS deploy on Hetzner Falkenstein incl. the edge-hardening checklist — `docs/plans/phase-0.md` Task 16 | `docs/runbooks/deploy-vps.md` | `https://api.<domain>/brain/health` over TLS |
+| C.4 | Reasoner provider switch: decide Q4 (primary + fallback frontier API) by ADR; implement providers behind the A2.5 interface; only scrubbed payloads may leave | `services/brain/src/brain/providers/*`, ADR | Provider tests; egress audit shows only allowlisted payloads |
+| C.5 | Tailscale PC ↔ VPS for style/trainer (ADR-0008) | `infra/docker-compose.pc.yml` | VPS reaches style `/health` over Tailscale only |
+| C.6 | Re-run Twin Eval with the frontier judge; record local vs frontier scores side by side | `docs/reports/eval-judge-comparison.md` | Report committed; gates re-checked |
+| C.7 | Voice vendors (ElevenLabs, Deepgram, LiveKit Cloud) only if A6 chose them by ADR | — | Per that ADR |
+
+**Exit gate C**: web on Vercel, services on the VPS, data on Supabase cloud; owner sign-in works end to end; egress audit proves zero corpus bytes leave the PC; Fidelity with the frontier judge meets the A2/A4 gate values.
+
+---
+
 ## Order of execution (recommended)
 
-`0` → `A1` (Ali-time heavy; start `B5` in parallel) → `A2` → `A3` → `A4` → `A6` → `B7` → `A8` (ongoing).
+`0` → `A1` (Ali-time heavy; start `B5` in parallel) → `A2` → `A3` → `A4` → `C` (cloud move, when Ali decides) → `A6` → `B7` → `A8` (ongoing).
 
 ## Time estimate
 

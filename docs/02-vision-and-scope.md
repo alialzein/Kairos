@@ -38,5 +38,5 @@ A digital self of Ali that:
 ## Constraints
 
 - Solo builder (Ali) + AI agents. Plan favors clear module boundaries so agents can work in parallel tracks.
-- Budget-conscious: prefer free tiers/self-host; cloud spend limited to Reasoner API, ElevenLabs, LiveKit Cloud (or self-host), Vercel, one VPS.
+- Budget-conscious: the home stage costs nothing (ADR-0014). In the cloud stage, spend is limited to Reasoner API, ElevenLabs, LiveKit Cloud (or self-host), Vercel, one VPS.
 - Ali's PC doubles as gaming rig: training jobs must be schedulable (nightly) and interruptible.

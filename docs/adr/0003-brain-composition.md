@@ -3,6 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-03
 - **Deciders**: Ali (decision interview with Claude)
+- **Amended by**: ADR-0014 — the Reasoner is a local Ollama model in the home stage; "frontier API" applies from Phase C. The two-stage pipeline is unchanged.
 
 ## Context
 Research (01-research A3, B1, B2): in-context structured personas match or beat small fine-tunes on facts/opinions; fine-tuning excels at style; style-only models lack life context.

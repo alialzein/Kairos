@@ -72,11 +72,12 @@ Usage policy: `/grill-with-docs` for any spec ambiguity or new decision (writes 
 
 | Env | Web | Services | Data |
 |---|---|---|---|
-| local | `pnpm dev` | `docker compose up` (+ pc profile) | local Supabase (CLI) |
-| preview | Vercel preview | VPS staging compose project | Supabase staging project |
-| prod | Vercel prod | VPS prod | Supabase prod |
+| home (ADR-0014, now — on the gaming PC) | `pnpm dev` (`-H 0.0.0.0` for the LAN) | `docker compose up` (+ `pc` + `obs` profiles); Ollama native on CUDA | local Supabase (CLI) |
+| dev (laptop) | lint, typecheck, tests, CI only — not a runtime | — | fixtures |
+| preview (Phase C) | Vercel preview | VPS staging compose project | Supabase staging project |
+| prod (Phase C) | Vercel prod | VPS prod | Supabase prod |
 
 ## 7. Ali's PC setup checklist
 
-- NVIDIA driver + CUDA-capable Docker (WSL2 if Windows), Tailscale, `uv`, Python 3.12, Ollama (for local labeling model), disk: ≥ 100 GB free for corpus + models.
+- Windows 11 · current NVIDIA Game Ready driver · Docker Desktop with the WSL2 backend (free for personal use) · Ollama for Windows (latest; RTX 50-series needs a recent build) with `ollama pull qwen3.5:9b` and `OLLAMA_HOST=0.0.0.0:11434` so containers can reach it · Node 24 + pnpm 11 (`corepack enable`) · `uv` (pins Python 3.12) · Git · Tailscale only for off-LAN access · disk ≥ 100 GB free for corpus + models. Step-by-step: `docs/runbooks/local-dev.md` → "Home stage on the gaming PC".
 - Scheduled window for training (Task Scheduler / cron) that skips if a game process is running (`pubg` check) — keeps Ali's FPS safe.

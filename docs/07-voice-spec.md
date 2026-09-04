@@ -28,6 +28,8 @@ LiveKit room ──▶ services/voice (LiveKit Agents worker, Python)
 - Language: STT set to auto-detect between ar + en with code-switch tolerance; Brain mirrors; TTS model must handle mixed-script input (ElevenLabs multilingual does).
 - Text fallback: if voice providers fail twice in a session, switch to text input with the same session id.
 
+**Home stage (ADR-0014).** Until Phase C no paid voice vendor is used. The A6.1 bake-off measures, on the PC's GPU, faster-whisper (large-v3-turbo) for STT, Piper or Kokoro for TTS and F5-TTS/XTTS-v2 (§4.2 fallback) for the clone, with `livekit-server` self-hosted in compose; the results decide by ADR whether the cloud stage keeps ElevenLabs, Deepgram and LiveKit Cloud.
+
 ### Latency budget (end of user speech → first audio)
 
 | Stage | Target |
@@ -43,7 +45,8 @@ Tuning levers for Phase 8: preemptive generation on interim transcripts, skip st
 
 ## 3. LiveKit deployment
 
-- Phase 6: LiveKit Cloud (free tier) for speed; region nearest Lebanon.
+- Home stage: `livekit-server` self-hosted in compose on the PC (free, LAN latency).
+- Cloud stage, Phase 6: LiveKit Cloud (free tier) for speed; region nearest Lebanon.
 - ADR trigger to self-host `livekit-server` on the VPS: cost > free tier, or latency measurements show cloud region penalty > 80 ms.
 
 ## 4. Voice Clone (Ali's voice, Arabic + English)

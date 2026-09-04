@@ -16,7 +16,8 @@ Terms are used exactly as defined here, in code, docs, and conversation. Add a t
 | **Persona Extraction** | The pipeline that proposes Persona Core content from the Corpus. |
 | **Style Exemplar** | A short, PII-scrubbed real message by Ali, indexed for retrieval as a few-shot example of his voice. |
 | **Style Engine** | The local LoRA-adapted open model that rewrites drafts into Ali's voice. |
-| **Reasoner** | The frontier cloud LLM that drafts the Twin's answer with Persona Core + memories in context. |
+| **Reasoner** | The LLM that drafts the Twin's answer with Persona Core + memories in context. A local Ollama model in the Home stage; a frontier cloud model in the Cloud stage. |
+| **Lite mode** | The Brain answering without the Style Engine: Reasoner + Style Exemplars only. Shown as a badge in the UI. |
 | **Brain** | The orchestrator service: assembles context, calls Reasoner, calls Style Engine, writes memory. |
 | **Turn** | One user input → one Twin response, in text or voice. |
 | **Session** | A sequence of Turns with one continuous context. |
@@ -35,3 +36,6 @@ Terms are used exactly as defined here, in code, docs, and conversation. Add a t
 | **Channel** | Where a Turn happens: `web`, `voice`, `mobile`, `guest`. Affects register (casual vs professional). |
 | **Register** | The tone the Twin uses: `casual` (Ali's chat voice) or `professional` (Ali's client/HR voice). |
 | **Code-switching** | Ali's habit of mixing Levantine Arabic and English within a message. Cloned, not normalized. |
+| **Stage** | Where the Twin runs, selected by `.env` values and never by code: Home stage or Cloud stage (ADR-0014). |
+| **Home stage** | The first version: every component on Ali's gaming PC, local Reasoner, no paid service, zero egress. |
+| **Cloud stage** | Vercel + Supabase cloud + VPS with a frontier Reasoner, per ADR-0008/0013. Reached by roadmap Phase C. |

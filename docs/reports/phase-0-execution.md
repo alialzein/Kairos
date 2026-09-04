@@ -16,6 +16,8 @@ How `docs/plans/phase-0.md` was executed, every decision the agent took on Ali's
 
 ## Ali's open steps (in order)
 
+> Superseded on 2026-09-04 by ADR-0014 (home stage): steps 1–2 now happen on the gaming PC per `docs/runbooks/local-dev.md` → "Home stage on the gaming PC"; steps 3–5 (Vercel, Supabase cloud, Hetzner) moved to roadmap Phase C; step 6 is unchanged.
+
 1. Install Docker Desktop (plan P3), then follow `docs/runbooks/local-dev.md`: `.env` from `.env.example` with `SUPABASE_JWT_SECRET`, `docker compose -f infra/docker-compose.yml up -d --build --wait`, `pnpm supabase start`, `pnpm supabase test db`.
 2. First sign-in: `ALLOW_SIGNUP=true` once, magic link via Mailpit, promote yourself in Studio, put your `auth.users.id` in `OWNER_USER_IDS` in BOTH `apps/web/.env.local` and the repo-root `.env`, set `ALLOW_SIGNUP=false`.
 3. Vercel: import `alialzein/Kairos`, root directory `apps/web`, env vars per plan Task 11 Step 2 → preview URL is the last exit-gate evidence.

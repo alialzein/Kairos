@@ -37,13 +37,13 @@ This folder is the **complete pre-implementation plan**. Nothing here is code ye
 ## Decisions already made (summary)
 
 - **Purpose**: personal assistant that thinks like Ali → twin others can talk to → long-term preservation of his mind. Phased.
-- **Privacy**: hybrid. Frontier cloud LLM for reasoning; **raw data and the style model never leave Ali's machines**.
+- **Privacy**: hybrid. A local Reasoner (Ollama) in the home stage, a frontier cloud LLM in the cloud stage; **raw data and the style model never leave Ali's machines**.
 - **Brain composition**: frontier model drafts as Ali → local LoRA "style engine" rewrites in Ali's voice.
 - **Inputs**: Claude/ChatGPT history, notes/docs/social posts, work emails, plus 3–5 hours of structured recorded interviews (Arabic + English).
 - **Language**: mirror Ali's language and clone his Levantine-Arabic/English code-switching.
 - **Voice**: Ali's own cloned voice (30+ min recordings, both languages).
 - **Avatar**: humanoid particle bust (like the reference screenshots) that morphs to an orb when idle.
-- **Deployment**: Vercel (web) + VPS Docker (Python services) + Ali's GPU PC (training, style model serving).
+- **Deployment**: two stages (ADR-0014). **Home stage first**: everything on Ali's gaming PC with a local Reasoner, zero paid services. **Cloud stage later** (Phase C): Vercel (web) + VPS Docker (Python services) + Ali's GPU PC (training, style model serving).
 - **Mobile**: PWA first, Android APK via Capacitor later.
 - **Name**: **Kairos** (Greek: "the right moment"). Wake phrase: "Hey Kairos" / "يا كايروس". See ADR-0012.
 

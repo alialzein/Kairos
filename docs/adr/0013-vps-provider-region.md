@@ -3,6 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-03
 - **Deciders**: Ali
+- **Scope**: cloud stage only (ADR-0014); the deploy is roadmap Phase C task C.3.
 
 ## Context
 ADR-0008 puts the always-on services (brain, memory, voice, redis, falkordb, caddy) on one VPS and defers the provider/region to open question Q10. Candidates: Hetzner (Falkenstein or Helsinki) and DigitalOcean (Frankfurt). Target size ~4 vCPU / 8 GB / 80 GB. Measured expectation Lebanon ↔ Germany ≈ 60–90 ms.

@@ -15,6 +15,8 @@
 
 Enforcement: (1) CI check blocks any staged path under `corpus/`; (2) the trainer's uploader has an allowlist of exactly one artifact (`exemplars.jsonl`); (3) egress audit in Phase 1 gate: run ingestion with a network monitor and prove zero outbound bytes; (4) scrubber runs before *any* LLM labeling call, even for local models, so pipeline behavior doesn't depend on locality.
 
+Home stage (ADR-0014): the Reasoner is local, so the third column is moot until Phase C — nothing leaves the PC. Enforcement (1)–(4) is built and tested in the home stage anyway so the cloud stage inherits it unchanged.
+
 ## 2. Scrubbing rules
 
 - Secrets (regex + entropy): drop line.
@@ -25,7 +27,7 @@ Enforcement: (1) CI check blocks any staged path under `corpus/`; (2) the traine
 ## 3. Access control
 
 - Supabase Auth; Owner = Ali's account only (allowlist by user id). Guests (Phase 8) via invite links with expiry.
-- Services on the VPS accept only JWTs minted by Supabase; internal service-to-service calls use a shared secret over the Docker network; PC services only over Tailscale.
+- Services (on the PC in the home stage, on the VPS in the cloud stage) accept only JWTs minted by Supabase; internal service-to-service calls use a shared secret over the Docker network; PC services reachable from the VPS only over Tailscale.
 - Dashboard actions on memory/persona are audit-logged with before/after.
 
 ## 4. Secrets management
@@ -48,3 +50,4 @@ Enforcement: (1) CI check blocks any staged path under `corpus/`; (2) the traine
 
 - Postgres: Supabase PITR/daily; FalkorDB snapshot nightly to object storage (encrypted); corpus: Ali's own backup discipline (recommend an encrypted external drive + versioned cloud backup of the encrypted archive only).
 - "Delete everything" runbook: drop cloud tables, purge vendor voice clone, wipe VPS volumes, keep local corpus.
+- Home stage: nightly `pnpm supabase db dump` plus a FalkorDB volume snapshot to the encrypted external drive; there is no cloud copy by design.

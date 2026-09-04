@@ -48,7 +48,7 @@ Every retrieved item carries `[source, date]` in the prompt so the Reasoner can 
 
 ## 5. Reflection (nightly worker)
 
-Runs on the VPS at 03:00 Beirut time; no GPU needed.
+Runs at 03:00 Beirut time (on the PC in the home stage, on the VPS after Phase C); no GPU needed.
 
 1. **Consolidate**: summarize the day's sessions into episodes; merge near-duplicate facts.
 2. **Contradiction scan**: for each new fact, find conflicting edges → close old edge or open a Review item if ambiguous.

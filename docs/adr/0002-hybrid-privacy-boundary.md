@@ -3,6 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-03
 - **Deciders**: Ali (decision interview with Claude)
+- **Amended by**: ADR-0014 — in the home stage the Reasoner is local (Ollama) and nothing leaves the PC; the cloud boundary below applies from Phase C.
 
 ## Context
 Best reasoning quality comes from frontier cloud models. Ali's raw exports, emails, interview audio and the fine-tuned style model are the most sensitive assets.

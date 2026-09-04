@@ -3,6 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-03
 - **Deciders**: Ali (decision interview with Claude)
+- **Scope**: cloud stage only (ADR-0014). The home stage runs everything on Ali's PC; this topology is reached by roadmap Phase C.
 
 ## Context
 Always-on services need a VPS; GPU work must stay local for privacy and cost; the web app is best served from the edge.
