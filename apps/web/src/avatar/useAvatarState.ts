@@ -19,6 +19,8 @@ export function useAvatarState(): AvatarStateApi {
   const pendingThink = useRef(false);
 
   useEffect(() => {
+    // a queued THINK only survives while we are still waking; any other state discards it
+    if (state !== "WAKING" && state !== "DORMANT") pendingThink.current = false;
     if (state === "WAKING") {
       const id = setTimeout(() => {
         dispatch("WAKE_DONE");
