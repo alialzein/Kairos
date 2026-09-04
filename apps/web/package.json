@@ -10,19 +10,25 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@react-three/fiber": "9.7.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.114.0",
     "@twin/config": "workspace:*",
     "@twin/shared": "workspace:*",
     "next": "^16.3.4",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "0.185.1",
+    "zustand": "5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@types/three": "0.185.4",
+    "leva": "0.10.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "vitest": "^4.1.11"
