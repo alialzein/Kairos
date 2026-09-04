@@ -81,4 +81,8 @@ describe("normalizeBust", () => {
     const cx = (bounds.min[0] + bounds.max[0]) / 2;
     expect(cx).toBeCloseTo(0);
   });
+
+  it("refuses an empty mesh instead of producing NaN", () => {
+    expect(() => normalizeBust(new Float32Array())).toThrow(/empty/);
+  });
 });

@@ -93,6 +93,7 @@ export function boundsOf(p: Float32Array): Bounds {
 
 /** Canonical bust space: x/z centred, y mapped to [-0.9, 0.9], uniform scale. */
 export function normalizeBust(p: Float32Array): { positions: Float32Array; bounds: Bounds } {
+  if (p.length === 0) throw new Error("normalizeBust: empty mesh");
   const b = boundsOf(p);
   const cx = (b.min[0] + b.max[0]) / 2;
   const cy = (b.min[1] + b.max[1]) / 2;
