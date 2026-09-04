@@ -1,0 +1,12 @@
+{
+  "source": "https://raw.githubusercontent.com/makehumancommunity/makehuman/3c701a8e52f09e69922e8b598d23be2d7dfc49e3/makehuman/data/3dobjs/base.obj",
+  "commit": "3c701a8e52f09e69922e8b598d23be2d7dfc49e3",
+  "licence": "CC0-1.0 (MakeHuman assets, license.txt §C)",
+  "yCut": 4.4,
+  "vertices": 5028,
+  "triangles": 9948,
+  "bounds": {
+    "min": [-1.1872191429138184, -0.8999999761581421, -0.5042750835418701],
+    "max": [1.1872191429138184, 0.8999999761581421, 0.5042750835418701]
+  }
+}
