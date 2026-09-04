@@ -4,18 +4,20 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { Accessor, Document, NodeIO, Primitive } from "@gltf-transform/core";
-import { cropByY, normalizeBust, parseObj, triangulate } from "./lib/obj";
+import { cropByAbsX, cropByY, normalizeBust, parseObj, triangulate } from "./lib/obj";
 
 const COMMIT = "3c701a8e52f09e69922e8b598d23be2d7dfc49e3";
 const SOURCE = `https://raw.githubusercontent.com/makehumancommunity/makehuman/${COMMIT}/makehuman/data/3dobjs/base.obj`;
 /** MakeHuman units are decimetres; the shoulder line sits near y ≈ 5.7, the chest at ≈ 4.6. */
 const Y_CUT = 4.4;
+/** MakeHuman decimetres: the shoulder line is ≈ ±2.0; anything wider is the upper arm of the A-pose figure. */
+const X_CUT = 2.2;
 const OUT_DIR = "apps/web/public/avatar";
 
 const res = await fetch(SOURCE);
 if (!res.ok) throw new Error(`download failed: ${res.status} ${SOURCE}`);
 const obj = parseObj(await res.text(), { group: "body" });
-const cropped = cropByY(obj, Y_CUT);
+const cropped = cropByAbsX(cropByY(obj, Y_CUT), X_CUT);
 const indices = triangulate(cropped.faces);
 const { positions, bounds } = normalizeBust(cropped.positions);
 
@@ -57,6 +59,7 @@ writeFileSync(
       commit: COMMIT,
       licence: "CC0-1.0 (MakeHuman assets, license.txt §C)",
       yCut: Y_CUT,
+      xCut: X_CUT,
       vertices: positions.length / 3,
       triangles: indices.length / 3,
       bounds,
