@@ -14,7 +14,8 @@ describe("simplex noise", () => {
     expect(Math.abs(n1(1, 1, 1) - n1(1.001, 1, 1))).toBeLessThan(0.05);
   });
   it("different seeds differ", () => {
-    expect(makeNoise(1)(0.5, 0.5, 0.5)).not.toBe(makeNoise(2)(0.5, 0.5, 0.5));
+    // (0.5, 0.5, 0.5) sits on a simplex lattice vertex where every seed returns 0
+    expect(makeNoise(1)(0.37, 0.61, 0.83)).not.toBe(makeNoise(2)(0.37, 0.61, 0.83));
   });
 });
 

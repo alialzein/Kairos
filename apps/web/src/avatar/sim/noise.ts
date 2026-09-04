@@ -32,13 +32,7 @@ export function makeNoise(seed: number): Noise3 {
   const dot = (v: readonly [number, number, number], x: number, y: number, z: number) =>
     v[0] * x + v[1] * y + v[2] * z;
 
-  return (xin0, yin0, zin0) => {
-    // Tiny fixed (seed-independent) offset so "round" inputs (e.g. 0.5,0.5,0.5) don't land
-    // exactly on a simplex lattice vertex, where the dot-product contribution is 0 for every
-    // gradient (hence every seed) — an inherent degeneracy of gradient noise, not a per-call effect.
-    const xin = xin0 + 1e-4;
-    const yin = yin0 + 2e-4;
-    const zin = zin0 + 3e-4;
+  return (xin, yin, zin) => {
     const s = (xin + yin + zin) * F3;
     const i = Math.floor(xin + s),
       j = Math.floor(yin + s),
