@@ -61,6 +61,15 @@ export function cropByY(m: ObjMesh, yMin: number): ObjMesh {
   return compact({ positions: m.positions, faces: keep });
 }
 
+/** Keep only faces whose every vertex has |x| <= xMax; drops geometry that reaches out sideways
+ * (e.g. an A-pose figure's upper arms) while leaving the torso/head silhouette intact. */
+export function cropByAbsX(m: ObjMesh, xMax: number): ObjMesh {
+  const keep = m.faces.filter((f) =>
+    f.every((vi) => Math.abs(m.positions[vi * 3] ?? Infinity) <= xMax),
+  );
+  return compact({ positions: m.positions, faces: keep });
+}
+
 export function triangulate(faces: number[][]): Uint32Array {
   const out: number[] = [];
   for (const f of faces) {

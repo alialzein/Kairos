@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cropByY, normalizeBust, parseObj, triangulate } from "./obj";
+import { cropByAbsX, cropByY, normalizeBust, parseObj, triangulate } from "./obj";
 
 const CUBE = `
 g body
@@ -38,6 +38,23 @@ describe("cropByY", () => {
     const top = cropByY({ positions: m.positions, faces: [[2, 3, 7, 6]] }, 0.5);
     expect(top.faces).toEqual([[0, 1, 2, 3]]);
     expect(top.positions.length).toBe(4 * 3);
+  });
+});
+
+describe("cropByAbsX", () => {
+  it("drops faces with any vertex outside |x| <= xMax and compacts vertices", () => {
+    const m = parseObj(CUBE, { group: "body" });
+    const c = cropByAbsX(m, 0.5);
+    expect(c.faces).toHaveLength(0); // every cube face spans x = ±1
+    const narrow = cropByAbsX(
+      {
+        positions: new Float32Array([-0.4, 0, 0, 0.4, 0, 0, 0.4, 1, 0, -0.4, 1, 0]),
+        faces: [[0, 1, 2, 3]],
+      },
+      0.5,
+    );
+    expect(narrow.faces).toEqual([[0, 1, 2, 3]]);
+    expect(narrow.positions.length).toBe(4 * 3);
   });
 });
 
