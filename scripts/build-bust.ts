@@ -18,6 +18,9 @@ const res = await fetch(SOURCE);
 if (!res.ok) throw new Error(`download failed: ${res.status} ${SOURCE}`);
 const obj = parseObj(await res.text(), { group: "body" });
 const cropped = cropByAbsX(cropByY(obj, Y_CUT), X_CUT);
+if (cropped.faces.length === 0) {
+  throw new Error(`crop removed every face (Y_CUT=${Y_CUT}, X_CUT=${X_CUT}); loosen the cuts`);
+}
 const indices = triangulate(cropped.faces);
 const { positions, bounds } = normalizeBust(cropped.positions);
 
