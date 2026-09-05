@@ -30,6 +30,7 @@ import {
 } from "three/webgpu";
 import { SHAPE_ID } from "@twin/config";
 import { ANCHORS } from "./canonical";
+import { packTargets } from "./pack";
 import type { Palette } from "./palette";
 import type { Targets } from "./targets";
 import type { SimUniforms } from "./uniforms";
@@ -42,36 +43,6 @@ export interface Sim {
 }
 
 const v3 = (a: readonly [number, number, number]) => new Vector3(a[0], a[1], a[2]);
-
-/**
- * The four shape targets packed into ONE vec4 storage buffer, laid out as `n`-particle blocks in
- * SHAPE_ID order (HUMANOID 0, ORB 1, NEBULA 2, RING 3): xyz = that shape's position, w = the
- * particle's region (same value in every block, so any block can supply it). This lets the update
- * kernel touch a single "targets" storage buffer instead of four — three's WebGPU-with-WebGL2-
- * fallback compute emulation hits WebGL2's transform-feedback attribute limit once a kernel
- * references too many storage buffers (positions/velocities/4 shapes/regions = 8 was too many;
- * positions/velocities/targets = 3 is not).
- */
-function packTargets(targets: Targets): Float32Array {
-  const { n, regions } = targets;
-  const packed = new Float32Array(4 * n * 4);
-  const blocks: Array<[number, Float32Array]> = [
-    [SHAPE_ID.HUMANOID, targets.humanoid],
-    [SHAPE_ID.ORB, targets.orb],
-    [SHAPE_ID.NEBULA, targets.nebula],
-    [SHAPE_ID.RING, targets.ring],
-  ];
-  for (const [shapeId, positions] of blocks) {
-    const base = shapeId * n * 4;
-    for (let i = 0; i < n; i++) {
-      packed[base + i * 4] = positions[i * 3] ?? 0;
-      packed[base + i * 4 + 1] = positions[i * 3 + 1] ?? 0;
-      packed[base + i * 4 + 2] = positions[i * 3 + 2] ?? 0;
-      packed[base + i * 4 + 3] = regions[i] ?? 0;
-    }
-  }
-  return packed;
-}
 
 export function createSim(targets: Targets, u: SimUniforms, palette: Palette): Sim {
   const n = targets.n;
