@@ -1,0 +1,88 @@
+"use client";
+import dynamic from "next/dynamic";
+import { useEffect, useRef } from "react";
+import { AvatarState } from "@twin/shared";
+import { TIER_ORDER, type Tier } from "@twin/config";
+import { useAvatarStore } from "@/avatar/state/store";
+
+const AvatarCanvas = dynamic(() => import("@/avatar/AvatarCanvas").then((m) => m.AvatarCanvas), {
+  ssr: false,
+});
+
+declare global {
+  interface Window {
+    __twinAvatar?: {
+      ready: boolean;
+      backend: string | null;
+      tier: Tier | null;
+      frames: number;
+      stats: { p50: number; p95: number; count: number };
+      state: string;
+      log: string[];
+    };
+  }
+}
+
+export function BenchAvatar({
+  tier,
+  webgl,
+  demo,
+  state,
+}: {
+  tier?: string;
+  webgl: boolean;
+  demo: boolean;
+  state?: string;
+}) {
+  const forced =
+    tier && (TIER_ORDER as readonly string[]).includes(tier) ? (tier as Tier) : undefined;
+  const frames = useRef(0);
+
+  useEffect(() => {
+    const parsed = AvatarState.safeParse(state);
+    if (parsed.success) useAvatarStore.getState().setState(parsed.data);
+  }, [state]);
+
+  useEffect(() => {
+    const publish = () => {
+      const s = useAvatarStore.getState();
+      window.__twinAvatar = {
+        ready: s.ready,
+        backend: s.backend,
+        tier: s.tier,
+        frames: frames.current,
+        stats: s.frames,
+        state: s.state,
+        log: s.log,
+      };
+    };
+    const unsub = useAvatarStore.subscribe(publish);
+    let raf = 0;
+    const tick = () => {
+      frames.current += 1;
+      publish();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      unsub();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return (
+    <main
+      data-theme="dark"
+      data-bench="avatar"
+      data-demo={demo ? "1" : "0"}
+      className="fixed inset-0 bg-twin-bg"
+    >
+      <AvatarCanvas
+        tier={forced}
+        forceWebGL={webgl}
+        className="h-full w-full"
+        interactive={false}
+      />
+    </main>
+  );
+}
