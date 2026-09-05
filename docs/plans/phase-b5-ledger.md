@@ -1,0 +1,91 @@
+# Phase B5 SDD ledger (copy)
+
+Verbatim copy of the git-ignored .superpowers/sdd/phase-b5/progress.md taken at the 2026-09-06 hand-off from the laptop to the gaming PC. To resume: copy this file back to .superpowers/sdd/phase-b5/progress.md (create the directory) and run superpowers:subagent-driven-development on docs/plans/phase-b5.md; it resumes at the first task without a complete line (Task 6).
+
+---
+
+# SDD ledger — plan: docs/plans/phase-b5.md
+
+Spec: docs/06-avatar-spec.md (+ docs/11 B5 table, packages/shared contracts, Ali's 2026-09-04 answers). Plan committed on main at d2e4675. Execution started 2026-09-04.
+
+## Pre-flight scan
+
+| Pair / task | Produces vs consumes | Finding |
+|---|---|---|
+| T1 → T3 | `ROLE_SPLIT`, `TIERS` from @twin/config | names match |
+| T1 → T5 | `TIERS`, `SHAPE_ID` (HUMANOID 0, ORB 1, NEBULA 2, RING 3), `AVATAR_STATES`, `Easing`; `tier.ts` (`baseTier/stepDown/tierFromProbe/parseTierOverride/readSignals`); `FrameStats` | match; `SHAPE_ID` order matches `shapeAt()` select chain |
+| T2 ↔ T3 | `boundsOf` exists in both `scripts/lib/obj.ts` and `apps/web/src/avatar/sim/sampler.ts` | duplication across two packages that cannot import each other (root scripts vs web app) — Ruling: accepted, 15 lines — cost if wrong: a shared helper package later |
+| T3 → T5 | `Targets {n, coreEnd, spineEnd, humanoid, orb, nebula, ring, regions, spineT, waves}`, `strided`, `loadBust` | match |
+| T4 → T5 | store `since` (ms), `tuning`, `pointer.strength` ±1, `Energy` from energy.ts | match; T5 divides `since` by 1000 |
+| T4 → T8 | `AvatarEvent`, `useAvatarState().send`, `setEnergy`, `playWakeCue` | match |
+| T5 → T6 | `AvatarCanvas` gains `PostPass` + aberration ref; `frame.ts` already emits `aberration` | consistent |
+| T5 → T7 | `DEFAULTS` exported from `sim/frame.ts`; `Tuning` keys = Leva controls | all eleven keys present in `Tuning` |
+| T5 → T8 | `BenchAvatar` demo branch renders `AvatarStage`; `onWake`/`onReady` props | consistent |
+| T5 → T9 | `window.__twinAvatar.stats {p50,p95,count}` | consistent across BenchAvatar and both specs |
+| T1 self | test asserts OFFLINE morphDuration ≤ 2.0, others ≤ 1.2 | table complies |
+| T2 self | OBJ fixture: `body` faces reference v1–v8 only; helper face excluded | consistent; `fetch` + top-level await under root `"type": "module"` |
+| T3 self | `regionsFor` neck point y=0.1 → yN 0.56 ∈ (0.5, 0.62] | consistent (fixed pre-execution) |
+| T4 self | `binRange` test bins 2..4 inside bass [1..6], outside mid [5..43] | consistent (fixed pre-execution) |
+| T5 self | `frame.test` expectations vs table (IDLE pulse 0.45–0.75, SPEAKING gain 0.5, LISTENING gain 0.4) | consistent |
+| T8 self | ribbon-updater lambda appears twice in `AvatarStage` (submit + onReady) | rubric: verbatim duplication — Ruling: implementer factors one `pushRibbon` callback; carried in the T8 dispatch — cost if wrong: none |
+| T9 self | `UPDATE_BASELINE` expression on push events → '0' | consistent |
+
+Pre-flight rulings:
+- Ruling: no git worktree; task branches `b5-NN-*` are created in the main checkout from `main`, PR per task, controller squash-merges after CI is green (plan D1, approved by Ali 2026-09-04) — why: branch-per-task + PR is the repo convention and gives isolation without a second checkout — cost if wrong: a stray uncommitted file could ride along; `git status` is checked before each dispatch.
+- Ruling: pushes, PR creation and squash-merges are durably authorised by Ali's approval of plan D1 ("Approve and execute") — cost if wrong: a merge Ali would have wanted to review first; every PR stays visible on GitHub.
+- Ruling: local Python service checks stay out of the B5 gate (uv launchers are quarantined on this laptop; CI runs them) — cost if wrong: none for B5 (no Python changes).
+
+## Task log
+
+Task 1: implementer acaa291de97024f8c (sonnet), BASE d2e4675, branch b5-01-foundations, commit 2c8cebe.
+Task 1: review (sonnet) spec ✅, quality Approved. ⚠️ resolved by controller: WAKING ORB→RING→HUMANOID sequencing lives in Task 5 `frame.ts` (plan); IDLE breathing period 4 s is hard-coded in the Task 5 kernel (`sin(time·π/2)`); `readSignals` is browser-only and exercised by the bench page (Task 5) — no gap.
+Task 1: minor (deferred): report narrative miscounted pre-existing config tests (3, not 4) — no code impact.
+Task 1: minor (deferred): `TIERS.low.targetFps = 0` comment says "reduced motion" but Low is also reachable from weak-hardware signals; clarify the comment when the renderer consumes `targetFps` (Task 5).
+Task 1: complete (commits d2e4675..2c8cebe, review clean). PR #2 opened by controller; squash-merge on green CI.
+
+Task 2: implementer ab05ee6dccd2829a5 (sonnet), BASE d2e4675, branch b5-02-bust, commit 66d25e8 — DONE_WITH_CONCERNS: (1) gltf-transform enum typing needed `?? fallback` + `Float32Array<ArrayBuffer>` casts; (2) Y-only crop keeps the upper arms of MakeHuman's A-pose figure (x ±1.19 normalised, 9 948 triangles).
+Task 2: Ruling: add a width crop `X_CUT = 2.2` (MakeHuman decimetres; every vertex of a kept face must satisfy |x| ≤ 2.2) as `cropByAbsX(mesh, xMax)` in `scripts/lib/obj.ts` with a test, applied after `cropByY`; manifest records `xCut`; brief's z sanity figure (±0.35) was a guess — measured ±0.5 is real chest depth and stands — why: docs/06 §2 asks for a head + shoulders bust, not arms; the plan's Y_CUT-only recipe was a plan defect — cost if wrong: a re-run of `pnpm build:bust` and a new GLB (one commit).
+Task 2: fix applied by the implementer before review (commit ecec1e9): `cropByAbsX`, X_CUT 2.2, manifest `xCut`; bust now 4 934 vertices / 9 736 triangles, x ±0.969, z ±0.504.
+Task 2: review (sonnet, a090d37e1d434723e) spec ✅, quality Approved; Important (plan-mandated): no guard against an empty crop → `normalizeBust` would emit NaN silently. Ruling: add `if (cropped.faces.length === 0) throw new Error(...)` in `build-bust.ts` after the crop pipeline — the plan's recipe omitted it; a loud failure is the spec's "deterministic, reproducible" asset in practice — cost if wrong: none (one line).
+Task 2: minor (deferred): `cropByAbsX` test uses contiguous indices, so it does not prove re-indexing (the `cropByY` test does).
+Task 2: minor (deferred): `cropByAbsX` was written green-first (disclosed in the fix report); logic is trivial and tested.
+Task 2: fix round 1/5 (1 addressed, 0 open — empty-crop guard in build-bust.ts + normalizeBust throw + test; commits ecec1e9..8aba8a8); re-review (haiku, a363d4220bbe9dbb6) clean. ⚠️ trailers verified by controller on both commits.
+Task 2: complete (commits d2e4675..8aba8a8, review clean). PR #3 opened by controller; CI green.
+Task 2: incident — `gh pr merge 3 --squash` failed with merge conflicts (branch cut from d2e4675, before Task 1's lockfile change) and the controller's script deleted the remote branch anyway, which closed PR #3. Recovery: rebase `b5-02-bust` onto `main` in a temporary worktree, take main's `pnpm-lock.yaml` and re-run `pnpm install --lockfile-only`, force-push, reopen PR #3 (or open a new one), merge on green. Ruling: from now on every task branch is cut from the freshly fetched `main`, and the merge script deletes the remote branch only after `gh pr view` reports MERGED — cost if wrong: another rebase.
+Task 2: recovered — rebased onto main (5e3068f, 1fb26cc, 2bc4472), PR #3 could not be reopened (GitHub refuses after branch deletion), PR #4 opened instead, CI green, squash-merged as 7daf023 on main.
+
+Task 3: implementer ac73f27ca5c01a002 (sonnet), BASE bdc86d3 (main after Task 1), branch b5-03-targets, commit 5abcc6e — DONE_WITH_CONCERNS: (1) the brief's noise test sampled (0.5,0.5,0.5), a simplex lattice vertex where every seed returns 0 — implementer added a coordinate offset inside `makeNoise`; (2) raw `curl()` magnitude (~3.8 avg) broke the nebula `rmax ≤ 2.2` test — implementer normalises the curl direction before scaling by 0.35.
+Task 3: Ruling: (1) revert the offset — keep standard simplex, fix the test to sample (0.37, 0.61, 0.83) and regenerate the snapshots once — why: production code must not carry test-shaped hacks; the brief's test was the defect — cost if wrong: none (snapshots regenerate). (2) accept the normalised curl direction — why: bounded displacement is what the spec's "curl-noise scattered volume" needs and the bound is provable — cost if wrong: a slightly more uniform nebula than raw curl would give.
+Task 3: rulings applied by the implementer before review (commit ece2db2; snapshots regenerated once).
+Task 3: review (sonnet, a1bf4c73fcbcf0b34) spec ✅, quality Approved. ⚠️ resolved by controller: trailers verified on 5abcc6e and ece2db2; `sim/bust.ts` is browser-only and gets exercised by the Task 5 bench page.
+Task 3: minor (deferred): `pick()` in `targets/index.ts` has no guard for `count > avail` (upscaling); `strided` only ever downsamples — add a guard/test when Task 5 wires the probe step-down.
+Task 3: minor (deferred): `strided` alignment of regions/spineT is asserted by length only (brief's test design).
+Task 3: minor (deferred): docs/06 says SPINE runs neck→chest; the brief's `ANCHORS` has no neck anchor, so the spine interpolates head→chest — cosmetic; revisit in the Task 7 playground if the tendrils look wrong.
+Task 3: complete (commits bdc86d3..ece2db2, review clean). PR #5 squash-merged as b959698 on main.
+
+Task 4: implementer a3de92add02ac27b3 (sonnet), BASE b959698 (main with Tasks 1–3), branch b5-04-state-audio, commit f907ba1 — DONE.
+Task 4: review (sonnet, a6db1b32dcdcb7277) spec ✅, quality Approved; Important (plan-mandated): `pendingThink` in `useAvatarState` is only cleared when WAKE_DONE fires, so a WAKING interrupted by FAILURE/forced state leaves the flag set and a later plain wake auto-dispatches THINK. Ruling: fix — the effect clears `pendingThink` whenever the state is neither DORMANT nor WAKING (the queued THINK is consumed synchronously inside the WAKE_DONE timer before React re-renders, so the legitimate path still works); no unit test (browser-only hook, Vitest is node-only by D12) — the bench E2E in Task 8 exercises the queue — cost if wrong: a wrong THINKING after an interrupted wake, visible in the playground.
+Task 4: minor (deferred): `now()` falls back to `Date.now()` when `performance` is undefined (SSR module eval) — harmless.
+Task 4: minor (deferred): `transition("LISTENING","INACTIVITY")` has no test.
+Task 4: minor (deferred): analyser smoothing (0.6) stacked with `smoothEnergy` may over-soften transients — tune in the Task 7 playground.
+Task 4: fix round 1/5 (1 addressed, 0 open — pendingThink cleared outside DORMANT/WAKING; commits f907ba1..c614acc); re-review (haiku, a798a00536c663d50) clean; trailer verified on c614acc.
+Task 4: complete (commits b959698..c614acc, review clean). PR opened by controller; squash-merge on green CI.
+Task 5: Ruling: the Task 5 branch is cut from `b5-04-state-audio` (not `main`) so the implementer can start while PR #6 runs CI; before Task 5's PR the controller runs `git rebase --onto main b5-04-state-audio b5-05-sim` — why: Task 5 imports the store/energy modules that only exist on that branch until the squash lands — cost if wrong: one rebase with no expected conflicts (disjoint files).
+Task 5: Ruling: `apps/web/src/proxy.ts` matcher additionally excludes `bench/` and `.glb` requests, because `updateSession` calls `supabaseEnv()` before checking public paths and would throw on `/bench/avatar` and on `/avatar/bust.glb` when `NEXT_PUBLIC_SUPABASE_*` are unset (CI's avatar job, and any laptop without `.env.local`); `/bench` stays in `PUBLIC_PREFIXES` as defence in depth — why: the bench page must run with zero Supabase configuration (plan D6) — cost if wrong: one regex line.
+Task 4: PR #6 squash-merged as 8a9737f on main.
+Task 5: implementer a9b8c15e7ee51e453 (sonnet), BASE c614acc (b5-04-state-audio), commit 2850ad8, rebased onto main as 5c7fafc on `b5-05-sim`, pushed as DRAFT PR #7 (Ali asked what to push while setting up the PC) — DONE_WITH_CONCERNS: (1) WebGL2 fallback never runs the particle kernel ("transformFeedbackVaryings: too many varyings": 8 storage buffers in the compute node); (2) NEBULA (DORMANT/OFFLINE) faint/sparse at camera z 3.1 fov 34 (half-height 0.95; nebula radius ≤ 1.95); (3) `packages/config` barrel no longer re-exports the Node-only identity loader (pulled `node:fs` into the client bundle); subpath `@twin/config/identity` added.
+Task 5: Ruling (1): pack the four shape targets into ONE `instancedArray(4·n, "vec4")` (xyz + region in w, HUMANOID block first) and index it as `element(instanceIndex + shapeId·n)`, so the update kernel touches three storage buffers (positions, velocities, targets); `regions`/`spineT` stay as material-only attributes — why: docs/06 §1 requires the automatic WebGL fallback, and WebGL2 transform feedback guarantees only 4 varyings — cost if wrong: a kernel rewrite (~40 lines), snapshots untouched.
+Task 5: Ruling (2): camera `position.z` 3.1 → 3.6 (half-height ≈ 1.10, so the ORB r = 1 and the bust y ± 0.9 fit with margin), nebula `randomInSphere(rng, 1.25)` with curl 0.3 (regenerate its snapshot once), DORMANT `brightness` 0.35 → 0.5 — why: the plan's numbers clipped the ORB and pushed the nebula outside the frustum; Ali tunes the final look in Task 7 — cost if wrong: three numbers.
+Task 5: Ruling (3): accepted — `identityPath`/`loadIdentity`/`Identity` move to the `@twin/config/identity` subpath; the barrel stays browser-safe — why: a client bundle cannot carry `node:fs`; no consumer used the barrel path — cost if wrong: an import path.
+Task 5: rulings applied by the implementer before review (commit d5c3fff): packed `tAll` vec4 buffer (kernel = positions, velocities, tAll), camera z 3.6, nebula r 1.25 / curl 0.3 (snapshot regenerated), DORMANT brightness 0.5; root scripts typecheck clean. Residual: the "too many varyings" error is gone, but three 0.185.1's WebGL2 NodeBuilder intermittently fails to compile the sprite vertex shader (`nodeAttribute8` undeclared, ~50 % of fresh runs) and once read the wrong shape block; WebGPU path correct.
+Task 5: Ruling: the WebGL2 residual is PARKED as a follow-up owned by the gaming-PC session (Ali's instruction 2026-09-05): branch `b5-05-webgl-fallback` after PR #7 merges; candidate fixes sent to that session (drop float storage attributes from the material, slot-buffer targets, or a three version bump) — why: WebGPU is the primary path on Chrome desktop/Android and Safari 26+; the task's spec-visible deliverable (particles render, tiers, bench, smoke) is met — cost if wrong: browsers without WebGPU show waves only until the follow-up lands; the B5 gate's phone check must note which backend ran.
+Task 5: gaming-PC evidence (RTX 5070, Chrome, WebGPU) on d5c3fff: ultra IDLE p50 5.0 ms / p95 5.1 ms; high IDLE 5.0 / 5.1; SPEAKING 5.0 / 5.1; DORMANT 5.0 / 5.2 (vsync-bound) — desktop 60 fps gate met with headroom. Visuals confirmed: IDLE nested-shell orb + core/spine column + waves; SPEAKING bust with lit face; DORMANT diffuse cloud. Console: one first-load 404 (favicon), "THREE.Clock deprecated" (R3F internals), powerPreference notice.
+Task 5: review (sonnet, aeacf24c4ec46ec5f) spec ❌ on one point, quality Needs fixes. Important 1 (plan-mandated): `aberration` is computed by `computeFrame` but no `SimUniforms` key exists. Ruling: no change in Task 5 — `aberration` is a post-pass parameter and Task 6 wires it (`ParticleSystem` writes a shared ref, `PostPass` calls `pipeline.setAberration`); the brief's "same keys" prose overstated the sim uniform set — cost if wrong: none (Task 6 is the next task and its brief already carries the wiring). Important 2: `packTargets` (new pure logic) shipped without a unit test → fix round 1: extract it to `sim/pack.ts` (no three imports) with a TDD test.
+Task 5: minor (deferred): `packTargets` builds a 4·n·4 float array synchronously on every tier (re)build (~6.4 M floats at ultra).
+Task 5: minor (deferred): the `shapeCircle()` typing cast is duplicated in `compute.ts` and `wavesSystem.ts` (cross-referenced comment); extract a helper if a third site appears.
+Task 5: fix round 1/5 (1 addressed, 0 open — `packTargets` extracted to `sim/pack.ts` with 4 unit tests; commits d5c3fff..13b1fe6); re-review (haiku, ae8bcad0c976b9376) clean; trailers verified on 5c7fafc, d5c3fff, 13b1fe6.
+Task 5: complete (commits 8a9737f..13b1fe6, review clean, 1 parked: WebGL2 residual → PC session branch `b5-05-webgl-fallback`). PR #7 squash-merged as 09c984b on main.
+
+## Hand-off (2026-09-06)
+
+Ali moved development to the gaming PC (Remote Control session "Kairos setup and installation"). This ledger is copied verbatim to `docs/plans/phase-b5-ledger.md` on main so the PC session can recreate `.superpowers/sdd/phase-b5/progress.md` and resume with superpowers:subagent-driven-development at **Task 6** (post-processing). Tasks 1–5 are `complete` above; briefs regenerate with `scripts/task-brief docs/plans/phase-b5.md N`. Open parked item: Task 5 WebGL2 residual (PC branch `b5-05-webgl-fallback`, may land before or after Task 6 — rebase whichever comes second). Deferred minors are listed per task above and feed the final whole-branch review after Task 9. Gate evidence so far: desktop 60 fps met on the RTX 5070 (Task 5 entry); phone 30 fps, Ali's visual approval (Task 7 playground) and perf CI (Task 9) remain.
