@@ -4,6 +4,7 @@ import {
   hash,
   instanceIndex,
   instancedArray,
+  instancedBufferAttribute,
   length,
   mix,
   mx_noise_vec3,
@@ -16,21 +17,23 @@ import {
   step,
   time,
   deltaTime,
-  uint,
+  vec2,
   vec3,
   vec4,
   uniform,
 } from "three/tsl";
 import {
   AdditiveBlending,
+  InstancedBufferAttribute,
   Sprite,
   SpriteNodeMaterial,
   Vector3,
   type ComputeNode,
+  type Node,
 } from "three/webgpu";
 import { SHAPE_ID } from "@twin/config";
 import { ANCHORS } from "./canonical";
-import { packTargets } from "./pack";
+import { packRegionSpine, packShape } from "./pack";
 import type { Palette } from "./palette";
 import type { Targets } from "./targets";
 import type { SimUniforms } from "./uniforms";
@@ -39,6 +42,8 @@ export interface Sim {
   sprite: Sprite;
   init: ComputeNode;
   update: ComputeNode;
+  /** Upload the morph endpoints' target blocks. Call every frame; no-op unless a shape changed. */
+  setShapes(shapeA: number, shapeB: number): void;
   dispose(): void;
 }
 
@@ -49,21 +54,60 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   u.coreEnd.value = targets.coreEnd;
   u.spineEnd.value = targets.spineEnd;
 
+  const blocks: Float32Array[] = [];
+  blocks[SHAPE_ID.HUMANOID] = packShape(targets.humanoid, targets.regions, n);
+  blocks[SHAPE_ID.ORB] = packShape(targets.orb, targets.regions, n);
+  blocks[SHAPE_ID.NEBULA] = packShape(targets.nebula, targets.regions, n);
+  blocks[SHAPE_ID.RING] = packShape(targets.ring, targets.regions, n);
+  const nebula = blocks[SHAPE_ID.NEBULA] as Float32Array;
+
   const positions = instancedArray(n, "vec3");
   const velocities = instancedArray(n, "vec3");
-  const tAll = instancedArray(packTargets(targets), "vec4");
-  // kept for the material only (face glow, spine gradient) — never read inside the compute kernel.
-  const regions = instancedArray(Float32Array.from(targets.regions), "float");
-  const spineT = instancedArray(targets.spineT, "float");
+  // Morph endpoint slots — each holds one shape's block, rewritten from the CPU by setShapes().
+  // Slots (fixed-index reads) instead of one packed multi-block buffer indexed by
+  // `instanceIndex + n·shapeId`: three's WebGL2 fallback runs compute as transform feedback, where
+  // a storage read at a computed cross-particle index silently degrades to an attribute read at the
+  // particle's own index — every shape came back as block 0 (the HUMANOID bust). The kernel's four
+  // storage buffers (positions, velocities, targetA, targetB) sit within WebGL2's guaranteed limit
+  // of 4 transform-feedback varyings even if the backend counts read-only buffers.
+  const targetA = instancedArray(nebula.slice(), "vec4");
+  const targetB = instancedArray(nebula.slice(), "vec4");
+  let shapeIdA = SHAPE_ID.NEBULA as number;
+  let shapeIdB = SHAPE_ID.NEBULA as number;
+  const upload = (slot: typeof targetA, shapeId: number): void => {
+    const block = blocks[shapeId];
+    if (!block) return;
+    const attribute = slot.value as InstancedBufferAttribute;
+    (attribute.array as Float32Array).set(block);
+    attribute.needsUpdate = true;
+  };
+  const setShapes = (shapeA: number, shapeB: number): void => {
+    if (shapeA !== shapeIdA) {
+      shapeIdA = shapeA;
+      upload(targetA, shapeA);
+    }
+    if (shapeB !== shapeIdB) {
+      shapeIdB = shapeB;
+      upload(targetB, shapeB);
+    }
+  };
+
+  // static per-particle data the material reads: x = region, y = spine gradient position. A real
+  // InstancedBufferAttribute, not a storage buffer — the WebGL2 NodeBuilder's storage-as-attribute
+  // render path miscompiled intermittently (undeclared nodeAttribute / dimension mismatch).
+  // instancedBufferAttribute() is typed as the bare `Node` in @types/three 0.185.4 (same
+  // overload-narrowing gap as shapeCircle() below); reify through vec2() to restore swizzles.
+  const regionSpine = vec2(
+    instancedBufferAttribute(
+      new InstancedBufferAttribute(packRegionSpine(targets.regions, targets.spineT, n), 2),
+    ) as unknown as Node<"vec2">,
+  );
 
   const headAnchor = uniform(v3(ANCHORS.head));
   const faceAnchor = uniform(v3(ANCHORS.face));
   const earL = uniform(v3(ANCHORS.earL));
   const earR = uniform(v3(ANCHORS.earR));
 
-  // shape id → target position for this particle (0 HUMANOID, 1 ORB, 2 NEBULA, 3 RING — SHAPE_ID in @twin/config)
-  const shapeAt = (id: ReturnType<typeof float>) =>
-    tAll.element(instanceIndex.add(uint(n).mul(id.toUint()))).xyz;
   const roleOf = () => {
     const fi = float(instanceIndex);
     return select(
@@ -74,11 +118,7 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   };
 
   const init = Fn(() => {
-    // float(<number literal>) resolves to the `ConstNode` overload while shapeAt's parameter type is
-    // inferred as the `ConvertNode` overload (same VarNode<"float", ...> shape at runtime, TSL doesn't
-    // distinguish them) — same kind of @types/three overload-narrowing gap as shapeCircle() above.
-    const nebulaId = float(SHAPE_ID.NEBULA) as unknown as Parameters<typeof shapeAt>[0];
-    positions.element(instanceIndex).assign(shapeAt(nebulaId));
+    positions.element(instanceIndex).assign(targetB.element(instanceIndex).xyz);
     velocities.element(instanceIndex).assign(vec3(0));
   })().compute(n);
 
@@ -91,8 +131,8 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     const isMain = role.equal(2);
 
     const target = mix(
-      shapeAt(float(u.shapeA)),
-      shapeAt(float(u.shapeB)),
+      targetA.element(i).xyz,
+      targetB.element(i).xyz,
       smoothstep(0, 1, u.morph),
     ).toVar();
     // ORB breathing (±3 % over 4 s) — main particles only
@@ -116,9 +156,8 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     const push = vec3(dp.div(dl), 0)
       .mul(smoothstep(u.pointerRadius, 0, dl))
       .mul(u.pointerStrength.mul(3));
-    // SPEAKING: face region pulses outward with mid energy (region lives in tAll's w component —
-    // every block carries the same value, so the HUMANOID block, i.e. plain `i`, always has it).
-    const isFace = tAll.element(i).w.equal(1);
+    // SPEAKING: face region pulses outward with mid energy (region lives in the slots' w component)
+    const isFace = targetA.element(i).w.equal(1);
     const fromFace = pos.sub(faceAnchor);
     const pulse = normalize(fromFace)
       .mul(u.speak.mul(0.8))
@@ -141,7 +180,8 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   })().compute(n);
 
   const material = new SpriteNodeMaterial();
-  material.positionNode = positions.toAttribute();
+  const posAttr = positions.toAttribute();
+  material.positionNode = posAttr;
   const role = roleOf();
   const seed = hash(instanceIndex.add(7));
   const roleSize = select(role.equal(0), float(2.4), select(role.equal(1), float(1.5), float(1)));
@@ -151,8 +191,7 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     .mul(float(0.7).add(seed.mul(0.6)))
     .mul(sparkle);
 
-  const p = positions.element(instanceIndex);
-  const depth = smoothstep(-0.6, 0.6, p.z);
+  const depth = smoothstep(-0.6, 0.6, posAttr.z);
   const mainColor = mix(
     vec3(palette.deep.r, palette.deep.g, palette.deep.b),
     vec3(palette.particle.r, palette.particle.g, palette.particle.b),
@@ -168,9 +207,9 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   const spineColor = mix(
     vec3(palette.spineFrom.r, palette.spineFrom.g, palette.spineFrom.b),
     vec3(palette.spineTo.r, palette.spineTo.g, palette.spineTo.b),
-    spineT.element(instanceIndex),
+    regionSpine.y,
   );
-  const faceGlow = select(regions.element(instanceIndex).equal(1), u.speak.mul(1.2), float(0));
+  const faceGlow = select(regionSpine.x.equal(1), u.speak.mul(1.2), float(0));
   const color = select(
     role.equal(0),
     coreColor,
@@ -194,6 +233,7 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     sprite,
     init,
     update,
+    setShapes,
     dispose: () => {
       material.dispose();
     },

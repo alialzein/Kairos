@@ -84,6 +84,7 @@ function ParticleSystem({
     );
     memory.current = r.memory;
     writeUniforms(uniforms, r.values);
+    sim.setShapes(r.values.shapeA, r.values.shapeB);
     gl.compute(sim.update);
     if (last.current) stats.current.push((now - last.current) * 1000);
     last.current = now;

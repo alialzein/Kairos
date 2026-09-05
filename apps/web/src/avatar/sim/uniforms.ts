@@ -4,8 +4,6 @@ import type { UniformValues } from "./frame";
 
 export function createSimUniforms() {
   return {
-    shapeA: uniform(2),
-    shapeB: uniform(2),
     morph: uniform(1),
     turbulence: uniform(0.15),
     brightness: uniform(0.35),
@@ -35,9 +33,9 @@ export function createSimUniforms() {
 }
 export type SimUniforms = ReturnType<typeof createSimUniforms>;
 
+// shapeA/shapeB are not uniforms: the kernel reads morph targets from the slot buffers that
+// Sim.setShapes() uploads (see sim/compute.ts).
 export function writeUniforms(u: SimUniforms, v: UniformValues): void {
-  u.shapeA.value = v.shapeA;
-  u.shapeB.value = v.shapeB;
   u.morph.value = v.morph;
   u.turbulence.value = v.turbulence;
   u.brightness.value = v.brightness;
