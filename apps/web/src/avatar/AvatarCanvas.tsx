@@ -210,7 +210,7 @@ export function AvatarCanvas({
       <Canvas
         frameloop={frameloop}
         dpr={[1, dprCap]}
-        camera={{ position: [0, 0.05, 3.1], fov: 34, near: 0.1, far: 50 }}
+        camera={{ position: [0, 0.05, 3.6], fov: 34, near: 0.1, far: 50 }}
         gl={async (props) => {
           const { WebGPURenderer } = await import("three/webgpu");
           const renderer = new WebGPURenderer({

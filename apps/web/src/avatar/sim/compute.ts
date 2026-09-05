@@ -16,6 +16,7 @@ import {
   step,
   time,
   deltaTime,
+  uint,
   vec3,
   vec4,
   uniform,
@@ -27,6 +28,7 @@ import {
   Vector3,
   type ComputeNode,
 } from "three/webgpu";
+import { SHAPE_ID } from "@twin/config";
 import { ANCHORS } from "./canonical";
 import type { Palette } from "./palette";
 import type { Targets } from "./targets";
@@ -41,6 +43,36 @@ export interface Sim {
 
 const v3 = (a: readonly [number, number, number]) => new Vector3(a[0], a[1], a[2]);
 
+/**
+ * The four shape targets packed into ONE vec4 storage buffer, laid out as `n`-particle blocks in
+ * SHAPE_ID order (HUMANOID 0, ORB 1, NEBULA 2, RING 3): xyz = that shape's position, w = the
+ * particle's region (same value in every block, so any block can supply it). This lets the update
+ * kernel touch a single "targets" storage buffer instead of four — three's WebGPU-with-WebGL2-
+ * fallback compute emulation hits WebGL2's transform-feedback attribute limit once a kernel
+ * references too many storage buffers (positions/velocities/4 shapes/regions = 8 was too many;
+ * positions/velocities/targets = 3 is not).
+ */
+function packTargets(targets: Targets): Float32Array {
+  const { n, regions } = targets;
+  const packed = new Float32Array(4 * n * 4);
+  const blocks: Array<[number, Float32Array]> = [
+    [SHAPE_ID.HUMANOID, targets.humanoid],
+    [SHAPE_ID.ORB, targets.orb],
+    [SHAPE_ID.NEBULA, targets.nebula],
+    [SHAPE_ID.RING, targets.ring],
+  ];
+  for (const [shapeId, positions] of blocks) {
+    const base = shapeId * n * 4;
+    for (let i = 0; i < n; i++) {
+      packed[base + i * 4] = positions[i * 3] ?? 0;
+      packed[base + i * 4 + 1] = positions[i * 3 + 1] ?? 0;
+      packed[base + i * 4 + 2] = positions[i * 3 + 2] ?? 0;
+      packed[base + i * 4 + 3] = regions[i] ?? 0;
+    }
+  }
+  return packed;
+}
+
 export function createSim(targets: Targets, u: SimUniforms, palette: Palette): Sim {
   const n = targets.n;
   u.coreEnd.value = targets.coreEnd;
@@ -48,10 +80,8 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
 
   const positions = instancedArray(n, "vec3");
   const velocities = instancedArray(n, "vec3");
-  const tHumanoid = instancedArray(targets.humanoid, "vec3");
-  const tOrb = instancedArray(targets.orb, "vec3");
-  const tNebula = instancedArray(targets.nebula, "vec3");
-  const tRing = instancedArray(targets.ring, "vec3");
+  const tAll = instancedArray(packTargets(targets), "vec4");
+  // kept for the material only (face glow, spine gradient) — never read inside the compute kernel.
   const regions = instancedArray(Float32Array.from(targets.regions), "float");
   const spineT = instancedArray(targets.spineT, "float");
 
@@ -61,18 +91,8 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   const earR = uniform(v3(ANCHORS.earR));
 
   // shape id → target position for this particle (0 HUMANOID, 1 ORB, 2 NEBULA, 3 RING — SHAPE_ID in @twin/config)
-  const shapeAt = (id: ReturnType<typeof float>) => {
-    const i = instanceIndex;
-    return select(
-      id.lessThan(0.5),
-      tHumanoid.element(i),
-      select(
-        id.lessThan(1.5),
-        tOrb.element(i),
-        select(id.lessThan(2.5), tNebula.element(i), tRing.element(i)),
-      ),
-    );
-  };
+  const shapeAt = (id: ReturnType<typeof float>) =>
+    tAll.element(instanceIndex.add(uint(n).mul(id.toUint()))).xyz;
   const roleOf = () => {
     const fi = float(instanceIndex);
     return select(
@@ -83,7 +103,11 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   };
 
   const init = Fn(() => {
-    positions.element(instanceIndex).assign(tNebula.element(instanceIndex));
+    // float(<number literal>) resolves to the `ConstNode` overload while shapeAt's parameter type is
+    // inferred as the `ConvertNode` overload (same VarNode<"float", ...> shape at runtime, TSL doesn't
+    // distinguish them) — same kind of @types/three overload-narrowing gap as shapeCircle() above.
+    const nebulaId = float(SHAPE_ID.NEBULA) as unknown as Parameters<typeof shapeAt>[0];
+    positions.element(instanceIndex).assign(shapeAt(nebulaId));
     velocities.element(instanceIndex).assign(vec3(0));
   })().compute(n);
 
@@ -121,8 +145,9 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     const push = vec3(dp.div(dl), 0)
       .mul(smoothstep(u.pointerRadius, 0, dl))
       .mul(u.pointerStrength.mul(3));
-    // SPEAKING: face region pulses outward with mid energy
-    const isFace = regions.element(i).equal(1);
+    // SPEAKING: face region pulses outward with mid energy (region lives in tAll's w component —
+    // every block carries the same value, so the HUMANOID block, i.e. plain `i`, always has it).
+    const isFace = tAll.element(i).w.equal(1);
     const fromFace = pos.sub(faceAnchor);
     const pulse = normalize(fromFace)
       .mul(u.speak.mul(0.8))

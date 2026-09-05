@@ -41,7 +41,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
   DORMANT: {
     shape: "NEBULA",
     turbulence: 0.15,
-    brightness: 0.35,
+    brightness: 0.5,
     corePulse: { period: 6, min: 0.15, max: 0.35 },
     tint: [0.7, 0.8, 1.0],
     morphDuration: 1.2,
