@@ -15,7 +15,9 @@ Decisions taken with Ali:
 
 1. **Fidelity: replicate 1:1.** The awake bust is line-drawn; the current dust bust is demoted to a
    faint under-layer.
-2. **Likeness stays.** Contour lines trace Ali's hairstyle and glasses (beard remains dust).
+2. **Likeness stays — without glasses.** Contour lines trace Ali's hairstyle (beard remains dust).
+   Glasses were built as line loops in L3 and then removed at Ali's request ("I didn't like it",
+   2026-09-06); the generator remains in `lines/likenessMesh.ts`, switched off.
 3. **Lines for the bust, particles for the rest.** DORMANT galaxy, IDLE orb, dissolve/assemble
    effects keep today's particle system. The line layer fades in with the humanoid weight.
 4. **Rendering approach A: real 3D line geometry** — CPU mesh slicing → closed loops → three.js

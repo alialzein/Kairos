@@ -22,7 +22,7 @@ import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
 import { createVeinLines } from "./lines/VeinLines";
 import { chestNode, mergeTrees, spineTree } from "./lines/veins";
-import { appendPolylines, glassesPolylines, liftMesh } from "./lines/likenessMesh";
+import { liftMesh } from "./lines/likenessMesh";
 import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
 
@@ -275,21 +275,19 @@ export function AvatarCanvas({
     setTier(tier);
     void loadBust().then((raw) => {
       if (cancelled) return;
-      // likeness (L3): the hairstyle lives on the mesh so lines and particles agree; the glasses
-      // are appended to the contour set as real line loops
+      // likeness (L3): the hairstyle lives on the mesh so lines and particles agree. Glasses are
+      // deliberately OFF (Ali, 2026-09-06: "remove the glasses, I didn't like it") — the
+      // generator stays in lines/likenessMesh.ts should he want them back.
       const bust = liftMesh(raw);
       setContours(
         (prev) =>
           prev ??
-          appendPolylines(
-            sliceMesh(bust.positions, bust.indices, {
-              count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
-              yMin: -0.9,
-              yMax: 0.9,
-              spacing: 0.012,
-            }),
-            glassesPolylines(),
-          ),
+          sliceMesh(bust.positions, bust.indices, {
+            count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
+            yMin: -0.9,
+            yMax: 0.9,
+            spacing: 0.012,
+          }),
       );
       setTargets((prev) =>
         prev && prev.n >= TIERS[tier].particles
