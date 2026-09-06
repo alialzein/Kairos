@@ -1,4 +1,4 @@
-import { Box3 } from "three";
+import { Box3, type BufferAttribute } from "three";
 import { describe, expect, it } from "vitest";
 import { sceneConfig } from "../sceneConfig";
 import { boundaryVertices, meshBust, primitiveBust, straightenArmCrops } from "./bustGeometry";
@@ -6,7 +6,7 @@ import { boundaryVertices, meshBust, primitiveBust, straightenArmCrops } from ".
 describe("primitiveBust", () => {
   const b = sceneConfig.bust;
   const g = primitiveBust(b, 32);
-  const box = new Box3().setFromBufferAttribute(g.getAttribute("position") as never);
+  const box = new Box3().setFromBufferAttribute(g.getAttribute("position") as BufferAttribute);
 
   it("is one indexed, smooth-normal geometry", () => {
     expect(g.getIndex()).not.toBeNull();
@@ -43,7 +43,7 @@ describe("meshBust", () => {
     const indices = new Uint32Array([0, 1, 2, 3, 4, 5]);
     const g = meshBust(positions, indices, { scale: 2, offset: [0, 1, 0] });
     expect(g.getAttribute("position").count).toBe(4);
-    const box = new Box3().setFromBufferAttribute(g.getAttribute("position") as never);
+    const box = new Box3().setFromBufferAttribute(g.getAttribute("position") as BufferAttribute);
     expect(box.min.y).toBeCloseTo(1);
     expect(box.max.y).toBeCloseTo(3);
     expect(box.max.x).toBeCloseTo(2);
@@ -74,6 +74,13 @@ describe("meshBust", () => {
     }
     // the inner column is not on the crop boundary in the zone (|x| ≤ xMin) and stays put
     for (let k = 0; k < ys.length; k++) expect(pos[k * 2 * 3] ?? 0).toBe(0.5);
+    // the left side is handled independently and mirrors the right
+    const mirrored = Float32Array.from(positions, (v, i) => (i % 3 === 0 ? -v : v));
+    straightenArmCrops(mirrored, indices, { xMin: 0.7, yMin: -0.95, yMax: -0.2 });
+    for (let k = 0; k < ys.length; k++) {
+      expect(mirrored[k * 2 * 3 + 3]).toBeCloseTo(-(pos[k * 2 * 3 + 3] ?? 0), 5);
+      expect(mirrored[k * 2 * 3]).toBe(-0.5);
+    }
   });
   it("finds boundary vertices as the endpoints of single-triangle edges", () => {
     const b = boundaryVertices([0, 1, 2, 1, 3, 2], 4);

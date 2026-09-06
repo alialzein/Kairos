@@ -7,18 +7,19 @@ import { sceneConfig } from "./sceneConfig";
 
 /**
  * Phase 6 — thin concentric rings behind the head (docs/plans/scene-plan.md Phase 6): one
- * RingGeometry annulus per ring (160 segments) in a group at rings.center, facing the camera,
- * `palette.line` at an opacity that fades outward. The opaque bust in front occludes them
- * naturally. The renderer's 4× MSAA keeps the ~2 px annuli smooth (the plan's "no aliased
- * LineBasicMaterial circles" rule).
+ * RingGeometry annulus per ring (`rings.segments` theta segments) in a group at rings.center,
+ * facing the camera, `palette.line` at an opacity that fades outward. The opaque bust in front
+ * occludes them naturally. The renderer's 4× MSAA keeps the ~2 px annuli smooth (the plan's
+ * "no aliased LineBasicMaterial circles" rule).
  */
 export function Rings() {
   const scene = useThree((s) => s.scene);
-  const group = useMemo(() => {
+  const built = useMemo(() => {
     const { rings, palette } = sceneConfig;
-    const g = new Group();
-    g.position.set(...rings.center);
+    const group = new Group();
+    group.position.set(...rings.center);
     const color = new Color(palette.line);
+    const meshes: Mesh<RingGeometry, MeshBasicNodeMaterial>[] = [];
     for (const spec of ringSpecs(rings)) {
       const material = new MeshBasicNodeMaterial({
         color,
@@ -29,24 +30,29 @@ export function Rings() {
       });
       material.fog = false;
       const mesh = new Mesh(
-        new RingGeometry(spec.radius, spec.radius + rings.thickness, 160),
+        new RingGeometry(spec.radius, spec.radius + rings.thickness, rings.segments),
         material,
       );
-      g.add(mesh);
+      meshes.push(mesh);
+      group.add(mesh);
     }
-    return g;
+    return {
+      group,
+      dispose() {
+        for (const mesh of meshes) {
+          mesh.geometry.dispose();
+          mesh.material.dispose();
+        }
+      },
+    };
   }, []);
 
   useEffect(() => {
-    scene.add(group);
+    scene.add(built.group);
     return () => {
-      scene.remove(group);
-      for (const child of group.children) {
-        const mesh = child as Mesh<RingGeometry, MeshBasicNodeMaterial>;
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-      }
+      scene.remove(built.group);
+      built.dispose();
     };
-  }, [scene, group]);
+  }, [scene, built]);
   return null;
 }

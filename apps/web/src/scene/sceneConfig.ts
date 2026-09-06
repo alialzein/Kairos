@@ -84,8 +84,9 @@ export interface SceneConfig {
     pulseSpeed: number;
     pulseAmount: number;
     /** Phase 4 glow billboard: plane size (plan 0.9), z just in front of the face surface
-     *  (the mesh's nose tip is at z ≈ 0.61), centre alpha */
-    glow: { size: number; z: number; alpha: number };
+     *  (the mesh's nose tip is at z ≈ 0.61), centre alpha, and the scale-pulse amplitude as a
+     *  fraction of `pulseAmount` (the opacity pulses at the full amount) */
+    glow: { size: number; z: number; alpha: number; scalePulse: number };
   };
   neck: {
     jawY: number;
@@ -93,8 +94,14 @@ export interface SceneConfig {
     nodeY: number;
     /** y of each strand's bezier control point (plan: 0.75, between jaw and node) */
     controlY: number;
+    /** control x = jawX · this (plan: 0.6): how far the strands bow inward */
+    controlXFactor: number;
     /** fat-line width in CSS px (drei <Line lineWidth>) */
     lineWidth: number;
+    /** plan: material `transparent, opacity 0.9`. Applied as a multiplier on `palette.gold`
+     *  instead — the fat-line material stays opaque because a transparent Line2NodeMaterial
+     *  composites against a per-frame framebuffer copy + mip chain. Identical over the dark
+     *  fill; where strands cross contour lines they cover them instead of letting 10 % through */
     opacity: number;
     /** how far in front of the neck cylinder the strands sit (plan: 0.02) */
     lift: number;
@@ -119,16 +126,35 @@ export interface SceneConfig {
     thickness: number;
     opacityFrom: number;
     opacityTo: number;
+    /** RingGeometry theta segments (plan: 160) */
+    segments: number;
   };
   landscape: {
     xStart: number;
     xEnd: number;
+    /** number of x intervals per side: cols + 1 points, x reaching xEnd (plan `0..cols`) */
     cols: number;
+    /** exact row count. The plan's `0..rows` could also read as rows + 1 (7 rows, z to −2.9);
+     *  6 rows are built — Ali's call if the deeper grid is wanted */
     rows: number;
     zStart: number;
     zStep: number;
     baseY: number;
     amplitude: number;
+    /** smoothstep edges on |x| that keep the ridges off the bust: [start, end] (plan 1.2, 2.2;
+     *  the plan's feedback example "falloff start 1.2 → 1.6" tunes `falloff[0]`) */
+    falloff: [number, number];
+    /** y dropped per row going back (plan 0.05) */
+    rowSink: number;
+    /** two-octave ridge: noise2D(x·lowScale, j·rowScale)·lowWeight +
+     *  noise2D(x·highScale, j·rowScale)·highWeight (plan 0.55/0.7, 1.6/0.25, row 0.7) */
+    ridge: {
+      lowScale: number;
+      lowWeight: number;
+      highScale: number;
+      highWeight: number;
+      rowScale: number;
+    };
     dropout: number;
     goldRatio: number;
     /** PointsMaterial units (px = size · H/2 / depth); converted to a sprite size at render time */
@@ -174,9 +200,18 @@ export interface SceneConfig {
     radius: number;
     depth: number;
     size: number;
+    /** opacity of the brightest star (see opacityJitter) */
     opacity: number;
     /** widest aspect ratio the cone must cover */
     aspect: number;
+    /** cone widening beyond the frustum (1 = exact) */
+    margin: number;
+    /** per-star multipliers hashed by instance index — drei's `factor` randomises size 0.5..1
+     *  internally; the opacity jitter and the cyan tint are this port's additions */
+    sizeJitter: [number, number];
+    opacityJitter: [number, number];
+    /** 1 = palette.line, 0 = white */
+    tint: number;
     seed: number;
   };
 }
@@ -243,7 +278,7 @@ export const sceneConfig: SceneConfig = {
     radius: 0.35,
     pulseSpeed: 1.5,
     pulseAmount: 0.15,
-    glow: { size: 0.9, z: 0.72, alpha: 0.9 },
+    glow: { size: 0.9, z: 0.72, alpha: 0.9, scalePulse: 0.5 },
   },
 
   // plan: jawY 1.02 / controlY 0.75 / nodeY 0.42 for the sphere-head bust. On the mesh the chin
@@ -254,6 +289,7 @@ export const sceneConfig: SceneConfig = {
     jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22],
     nodeY: 0.15,
     controlY: 0.59,
+    controlXFactor: 0.6,
     lineWidth: 1.5,
     opacity: 0.9,
     lift: 0.02,
@@ -270,6 +306,7 @@ export const sceneConfig: SceneConfig = {
     thickness: 0.008,
     opacityFrom: 0.5,
     opacityTo: 0.06,
+    segments: 160,
   },
 
   landscape: {
@@ -281,6 +318,9 @@ export const sceneConfig: SceneConfig = {
     zStep: -0.4,
     baseY: -0.6,
     amplitude: 1.6,
+    falloff: [1.2, 2.2],
+    rowSink: 0.05,
+    ridge: { lowScale: 0.55, lowWeight: 0.7, highScale: 1.6, highWeight: 0.25, rowScale: 0.7 },
     dropout: 0.35,
     goldRatio: 0.1,
     pointSize: 0.025,
@@ -317,5 +357,17 @@ export const sceneConfig: SceneConfig = {
     dotSize: 6,
   },
 
-  stars: { count: 400, radius: 60, depth: 20, size: 0.08, opacity: 0.3, aspect: 2.2, seed: 2026 },
+  stars: {
+    count: 400,
+    radius: 60,
+    depth: 20,
+    size: 0.08,
+    opacity: 0.3,
+    aspect: 2.2,
+    margin: 1.1,
+    sizeJitter: [0.6, 1.4],
+    opacityJitter: [0.5, 1],
+    tint: 0.35,
+    seed: 2026,
+  },
 };

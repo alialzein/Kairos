@@ -7,6 +7,7 @@ const p: NeckParams = {
   jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22],
   nodeY: 0.42,
   controlY: 0.75,
+  controlXFactor: 0.6,
   neckRadius: 0.2,
   lift: 0.02,
   points: 40,

@@ -1,7 +1,6 @@
 "use client";
 import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
-import { float, instanceIndex, instancedArray, shapeCircle, vec4 } from "three/tsl";
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -9,13 +8,12 @@ import {
   Float32BufferAttribute,
   LineBasicNodeMaterial,
   LineSegments,
-  Sprite,
-  SpriteNodeMaterial,
 } from "three/webgpu";
 import { makeNoise } from "@/avatar/sim/noise";
 import { mulberry32 } from "@/avatar/sim/random";
 import { landscape } from "./gen/landscape";
 import { sceneConfig } from "./sceneConfig";
+import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 
 /**
  * Phase 7 — wireframe mountain networks on both sides (docs/plans/scene-plan.md Phase 7): the
@@ -48,32 +46,21 @@ export function Landscape() {
     };
     const blue = lines(mesh.blue, palette.landscape, l.blueOpacity);
     const gold = lines(mesh.gold, palette.gold, l.goldOpacity);
-
-    const c = new Color(palette.landscape);
-    const pointMaterial = new SpriteNodeMaterial();
-    pointMaterial.positionNode = instancedArray(mesh.points, "vec3").element(instanceIndex);
-    // plan size is PointsMaterial units (no fov term); sprite world size = size · tan(fov/2)
-    pointMaterial.scaleNode = float(l.pointSize * Math.tan((camera.fov * Math.PI) / 360));
-    pointMaterial.colorNode = vec4(c.r, c.g, c.b, 1);
-    // shapeCircle is typed as a bare Node in @types/three 0.185.4 (same gap as lines/Sparks.ts)
-    pointMaterial.opacityNode = float(shapeCircle() as unknown as Parameters<typeof float>[0]).mul(
-      l.pointOpacity,
-    );
-    pointMaterial.transparent = true;
-    pointMaterial.depthWrite = false;
-    pointMaterial.blending = AdditiveBlending;
-    const points = new Sprite(pointMaterial);
-    points.count = mesh.pointCount;
-    points.frustumCulled = false;
+    const points = createPointSprites({
+      points: mesh.points,
+      size: spriteSizeForPointSize(l.pointSize, camera.fov),
+      color: palette.landscape,
+      opacity: l.pointOpacity,
+    });
 
     return {
-      objects: [blue, gold, points] as const,
+      objects: [blue, gold, points.sprite] as const,
       dispose() {
         blue.geometry.dispose();
         blue.material.dispose();
         gold.geometry.dispose();
         gold.material.dispose();
-        pointMaterial.dispose();
+        points.dispose();
       },
     };
   }, []);

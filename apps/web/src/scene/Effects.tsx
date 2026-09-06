@@ -27,14 +27,16 @@ export function Effects() {
   const gl = useThree((s) => s.gl) as unknown as WebGPURenderer;
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
-  const pipeline = useMemo(() => {
+  const built = useMemo(() => {
     const { post } = sceneConfig;
-    const pipe = new RenderPipeline(gl);
+    const pipeline = new RenderPipeline(gl);
     const scenePass = pass(scene, camera);
     const color = scenePass.getTextureNode("output");
     const bloomNode = bloom(color, post.bloomStrength, post.bloomRadius, post.bloomThreshold);
     bloomNode.smoothWidth.value = post.bloomSmoothing;
     bloomNode.setResolutionScale(post.bloomResolutionScale);
+    // widen away from the TextureNode the pass returns: the chain below only needs vec4 arithmetic
+    // (@types/three 0.185.4 types getTextureNode() too narrowly; same cast as avatar/post/pipeline.ts)
     type ColorNode = ReturnType<(typeof color)["add"]>;
     const out = (color as unknown as ColorNode).add(bloomNode);
     const d = float(length(screenUV.sub(0.5)));
@@ -45,11 +47,19 @@ export function Effects() {
         d.mul(post.vignetteDarkness + post.vignetteOffset),
       ),
     );
-    pipe.outputNode = vec4(out.rgb.mul(vig), 1);
-    return pipe;
+    pipeline.outputNode = vec4(out.rgb.mul(vig), 1);
+    return { pipeline, scenePass, bloomNode };
   }, [gl, scene, camera]);
-  useEffect(() => () => pipeline.dispose(), [pipeline]);
+  useEffect(
+    () => () => {
+      // the pass and bloom own render targets that RenderPipeline.dispose() does not reach
+      built.bloomNode.dispose();
+      built.scenePass.dispose();
+      built.pipeline.dispose();
+    },
+    [built],
+  );
   // priority 1: R3F stops auto-rendering; the pipeline draws the frame
-  useFrame(() => pipeline.render(), 1);
+  useFrame(() => built.pipeline.render(), 1);
   return null;
 }

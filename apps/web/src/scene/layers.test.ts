@@ -30,6 +30,12 @@ describe("layersFromQuery", () => {
     });
     expect(layersFromQuery({ phase: "8", off: "bust" }).bust).toBe(false);
   });
+  it("applies phase, then only, then off, in that order", () => {
+    expect(layersFromQuery({ phase: "8", only: "bust,post", off: "post" })).toEqual({
+      ...Object.fromEntries(LAYER_NAMES.map((n) => [n, false])),
+      bust: true,
+    });
+  });
   it("every layer has a phase", () => {
     for (const n of LAYER_NAMES) expect(LAYER_PHASE[n]).toBeGreaterThan(0);
   });

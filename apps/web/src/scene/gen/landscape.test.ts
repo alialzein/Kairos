@@ -24,7 +24,7 @@ describe("landscape", () => {
       expect(ax).toBeGreaterThanOrEqual(cfg.xStart - 1e-9);
       expect(ax).toBeLessThanOrEqual(cfg.xEnd + 1e-9);
       // Float32Array storage: compare at float32 precision
-      expect(y).toBeGreaterThanOrEqual(cfg.baseY - (cfg.rows - 1) * 0.05 - 1e-6);
+      expect(y).toBeGreaterThanOrEqual(cfg.baseY - (cfg.rows - 1) * cfg.rowSink - 1e-6);
       expect(y).toBeLessThanOrEqual(cfg.baseY + cfg.amplitude + 1e-6);
       expect(z).toBeLessThanOrEqual(cfg.zStart + 1e-9);
     }
@@ -43,10 +43,26 @@ describe("landscape", () => {
       expect(meanY(m.blue, k)).toBeLessThanOrEqual(minGold + 1e-9);
   });
   it("rises with |x| (the falloff keeps the ridges off the bust) and is deterministic", () => {
-    const inner = landscape({ ...cfg, cols: 1, xStart: 1.2, xEnd: 1.2 }, () => 1, mulberry32(3));
+    const x0 = cfg.falloff[0];
+    const inner = landscape({ ...cfg, cols: 1, xStart: x0, xEnd: x0 }, () => 1, mulberry32(3));
     for (let p = 0; p < inner.pointCount; p++) {
       const j = p % cfg.rows;
-      expect(inner.points[p * 3 + 1]).toBeCloseTo(cfg.baseY - j * 0.05, 5);
+      expect(inner.points[p * 3 + 1]).toBeCloseTo(cfg.baseY - j * cfg.rowSink, 5);
+    }
+    // the falloff, ridge weights and row sink come from the config: with the falloff fully open
+    // and unit noise the height is amplitude × (lowWeight + highWeight)
+    const open = landscape(
+      { ...cfg, cols: 1, xStart: x0, xEnd: x0, falloff: [0, 1] },
+      () => 1,
+      mulberry32(3),
+    );
+    const w = cfg.ridge.lowWeight + cfg.ridge.highWeight;
+    for (let p = 0; p < open.pointCount; p++) {
+      const j = p % cfg.rows;
+      expect(open.points[p * 3 + 1]).toBeCloseTo(
+        cfg.baseY + cfg.amplitude * w - j * cfg.rowSink,
+        5,
+      );
     }
     const a = landscape(cfg, noise2D, mulberry32(4));
     const b = landscape(cfg, noise2D, mulberry32(4));

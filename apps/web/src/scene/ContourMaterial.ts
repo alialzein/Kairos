@@ -17,9 +17,17 @@ import {
 import { Color, FrontSide, MeshBasicNodeMaterial, Vector3 } from "three/webgpu";
 import type { SceneConfig } from "./sceneConfig";
 
-/** Live-tunable inputs of the contour shader, one uniform per sceneConfig value it reads. */
+/** Every sceneConfig input of the contour shader — the contours/core numbers and the four
+ *  palette colours — as a uniform. Nothing writes them at runtime yet: the bench tunes through
+ *  `?set=` before the material is built (BenchScene), but a live panel could drive these. */
 export function createContourUniforms(cfg: SceneConfig) {
-  const { contours, core } = cfg;
+  const { contours, core, palette } = cfg;
+  // colours as linear-rgb Vector3 uniforms: @types/three types uniform(Color) as a "color" node
+  // that vec3()/mix() overloads reject
+  const rgb = (hex: string) => {
+    const c = new Color(hex);
+    return new Vector3(c.r, c.g, c.b);
+  };
   return {
     frequency: uniform(contours.frequency),
     lineWidth: uniform(contours.lineWidth),
@@ -29,6 +37,10 @@ export function createContourUniforms(cfg: SceneConfig) {
     coreRadius: uniform(core.radius),
     pulseSpeed: uniform(core.pulseSpeed),
     pulseAmount: uniform(core.pulseAmount),
+    lineColor: uniform(rgb(palette.line)),
+    fillColor: uniform(rgb(palette.fill)),
+    edgeColor: uniform(rgb(palette.edge)),
+    coreColor: uniform(rgb(palette.core)),
   };
 }
 export type ContourUniforms = ReturnType<typeof createContourUniforms>;
@@ -38,25 +50,18 @@ export interface ContourMaterial {
   uniforms: ContourUniforms;
 }
 
-const c3 = (hex: string) => {
-  const c = new Color(hex);
-  return vec3(c.r, c.g, c.b);
-};
-
 /**
  * Phase 3 — the contour-line surface (docs/plans/scene-plan.md Phase 3), a line-for-line TSL
  * port of the plan's GLSL fragment shader: horizontal world-space slices (`fract(y·frequency)`)
  * anti-aliased with `fwidth`, a fresnel rim, and a pulsing warm core that tints lines and fill
  * near `core.center`. World-space y keeps the lines continuous across the whole mesh. Opaque,
- * front faces only, unlit; `time` is TSL's elapsed-seconds node (the plan's `uTime`). Every
- * number comes from sceneConfig through uniforms so it can be tuned live.
+ * front faces only, unlit; `time` is TSL's elapsed-seconds node (the plan's `uTime`).
  *
  * float()/vec3() wrappers reify intermediate nodes: @types/three 0.185.4 narrows some TSL
  * overloads (mix(vec3, vec3, float), smoothstep with uniform edges) to `never` — the same gap
  * lines/LineBust.ts works around.
  */
 export function createContourMaterial(cfg: SceneConfig): ContourMaterial {
-  const { palette } = cfg;
   const u = createContourUniforms(cfg);
 
   // horizontal slices, anti-aliased
@@ -80,16 +85,17 @@ export function createContourMaterial(cfg: SceneConfig): ContourMaterial {
   );
   const coreW = coreFall.mul(pulse);
 
-  const lineCol = vec3(mix(c3(palette.line), c3(palette.core), coreW));
-  const fill = vec3(mix(c3(palette.fill), c3(palette.core).mul(0.35), coreW.mul(0.7)));
+  const lineColor = vec3(u.lineColor);
+  const coreColor = vec3(u.coreColor);
+  const lineCol = vec3(mix(lineColor, coreColor, coreW));
+  const fill = vec3(mix(vec3(u.fillColor), coreColor.mul(0.35), coreW.mul(0.7)));
   const col = vec3(mix(fill, lineCol, line))
-    .add(c3(palette.edge).mul(fres).mul(0.6))
+    .add(vec3(u.edgeColor).mul(fres).mul(0.6))
     .mul(line.mul(0.8).add(1)); // push lines above the bloom threshold
 
   const material = new MeshBasicNodeMaterial();
   material.colorNode = col;
   material.side = FrontSide;
-  material.toneMapped = false;
   material.fog = false;
   return { material, uniforms: u };
 }

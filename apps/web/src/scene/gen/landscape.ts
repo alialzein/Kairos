@@ -23,8 +23,9 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
 /**
  * Wireframe mountain networks flanking the bust (docs/plans/scene-plan.md Phase 7). Per side a
  * `cols + 1` × `rows` grid (x from xStart to xEnd inclusive, z stepping back by zStep) whose
- * height is a two-octave ridge from the seeded noise, clamped ≥ 0, scaled by amplitude and a
- * falloff that keeps it off the bust (smoothstep(1.2, 2.2, |x|)), sinking 0.05 per row. Edges
+ * height is a two-octave ridge (`ridge`) from the seeded noise, clamped ≥ 0, scaled by amplitude
+ * and a falloff that keeps it off the bust (smoothstep(falloff[0], falloff[1], |x|)), sinking
+ * `rowSink` per row. Edges
  * connect (i,j)→(i+1,j), (i,j)→(i,j+1), (i,j)→(i+1,j+1) with `dropout` of them removed by the
  * seeded rng so the mesh reads organic, not as a grid; the top `goldRatio` of the kept edges by
  * mean y go to the gold list. Deterministic for a given noise + rng.
@@ -41,9 +42,12 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
       const x = sign * (l.xStart + (i / l.cols) * (l.xEnd - l.xStart));
       for (let j = 0; j < rows; j++) {
         const z = l.zStart + j * l.zStep;
-        const ridge = noise2D(x * 0.55, j * 0.7) * 0.7 + noise2D(x * 1.6, j * 0.7) * 0.25;
-        const falloff = smoothstep(1.2, 2.2, Math.abs(x));
-        const y = l.baseY + Math.max(ridge, 0) * l.amplitude * falloff - j * 0.05;
+        const { ridge: r } = l;
+        const ridge =
+          noise2D(x * r.lowScale, j * r.rowScale) * r.lowWeight +
+          noise2D(x * r.highScale, j * r.rowScale) * r.highWeight;
+        const falloff = smoothstep(l.falloff[0], l.falloff[1], Math.abs(x));
+        const y = l.baseY + Math.max(ridge, 0) * l.amplitude * falloff - j * l.rowSink;
         const k = index(side, i, j) * 3;
         points[k] = x;
         points[k + 1] = y;

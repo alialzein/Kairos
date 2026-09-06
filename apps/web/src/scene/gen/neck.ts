@@ -7,6 +7,8 @@ export interface NeckParams {
   nodeY: number;
   /** y of each strand's bezier control point (plan: 0.75) */
   controlY: number;
+  /** control x = jawX · this (plan: 0.6): how far the strands bow inward */
+  controlXFactor: number;
   /** the neck cylinder the strands hug: z = sqrt(r² − x²) + lift */
   neckRadius: number;
   /** how far in front of the cylinder the strands sit (plan: 0.02) */
@@ -50,7 +52,7 @@ export function neckCircuit(p: NeckParams, rng: Rng): NeckCircuit {
   for (const jawX of p.jawXs) {
     const curve = new QuadraticBezierCurve3(
       new Vector3(jawX, p.jawY, 0),
-      new Vector3(jawX * 0.6, p.controlY, 0),
+      new Vector3(jawX * p.controlXFactor, p.controlY, 0),
       new Vector3(0, p.nodeY, 0),
     );
     const pts = curve.getPoints(perStrand);
@@ -74,7 +76,7 @@ export function neckCircuit(p: NeckParams, rng: Rng): NeckCircuit {
     const r = Math.sqrt(rng()) * p.node.spread;
     nodePoints[i * 3] = Math.cos(a) * r;
     nodePoints[i * 3 + 1] = p.nodeY + Math.sin(a) * r;
-    nodePoints[i * 3 + 2] = nodeZ + 0.005;
+    nodePoints[i * 3 + 2] = nodeZ;
   }
   return { segments, nodePoints, node, strandCount: p.jawXs.length };
 }

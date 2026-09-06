@@ -40,6 +40,7 @@ function SceneCamera() {
 function FrameTicker({ onReady }: { onReady?: () => void }) {
   const stats = useRef(new FrameStats());
   const last = useRef(0);
+  const frame = useRef(0);
   const announced = useRef(false);
   useFrame(() => {
     const now = performance.now();
@@ -50,7 +51,8 @@ function FrameTicker({ onReady }: { onReady?: () => void }) {
       useSceneStore.getState().setReady(true);
       onReady?.();
     }
-    if (stats.current.count > 0 && stats.current.count % 30 === 0) {
+    // own counter: FrameStats.count pins at its 240-sample window, which is a multiple of 30
+    if (++frame.current % 30 === 0) {
       const s = stats.current;
       useSceneStore.getState().setStats({ p50: s.p50, p95: s.p95, count: s.count });
     }
