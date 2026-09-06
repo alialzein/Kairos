@@ -15,6 +15,9 @@ import { createSim } from "./sim/compute";
 import { buildTargets, strided, type Targets } from "./sim/targets";
 import { createSimUniforms, writeUniforms } from "./sim/uniforms";
 import { createWaves } from "./sim/wavesSystem";
+import { createHalo } from "./sim/haloSystem";
+import { halo } from "./sim/targets/halo";
+import { mulberry32 } from "./sim/random";
 import { useAvatarStore } from "./state/store";
 
 export interface AvatarCanvasProps {
@@ -51,6 +54,11 @@ function ParticleSystem({
     () => (wavesN > 0 ? createWaves(targets.waves, uniforms, PALETTE) : null),
     [targets, uniforms, wavesN],
   );
+  // halo rings ride the same tier gate as the waves (off on Low)
+  const hl = useMemo(
+    () => (wavesN > 0 ? createHalo(halo(4500, mulberry32(SEED + 8)), uniforms, PALETTE) : null),
+    [uniforms, wavesN],
+  );
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
@@ -58,6 +66,7 @@ function ParticleSystem({
   useEffect(() => {
     scene.add(sim.sprite);
     if (wv) scene.add(wv.sprite);
+    if (hl) scene.add(hl.sprite);
     let cancelled = false;
     void gl.computeAsync(sim.init).then(() => {
       if (!cancelled) onReady();
@@ -66,10 +75,12 @@ function ParticleSystem({
       cancelled = true;
       scene.remove(sim.sprite);
       if (wv) scene.remove(wv.sprite);
+      if (hl) scene.remove(hl.sprite);
       sim.dispose();
       wv?.dispose();
+      hl?.dispose();
     };
-  }, [sim, wv, scene, gl, onReady]);
+  }, [sim, wv, hl, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();
