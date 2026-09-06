@@ -15,12 +15,13 @@ import { createSim } from "./sim/compute";
 import { buildTargets, strided, type Targets } from "./sim/targets";
 import { createSimUniforms, writeUniforms } from "./sim/uniforms";
 import { createWaves } from "./sim/wavesSystem";
-import { createHalo } from "./sim/haloSystem";
-import { halo } from "./sim/targets/halo";
 import { mulberry32 } from "./sim/random";
 import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
 import { createVeinLines } from "./lines/VeinLines";
+import { createHaloRings } from "./lines/HaloRings";
+import { createSparks, createStarfield } from "./lines/Sparks";
+import { plumePoints, starPoints } from "./lines/halo";
 import { chestNode, mergeTrees, spineTree } from "./lines/veins";
 import { liftMesh } from "./lines/likenessMesh";
 import { sliceMesh, type Contours } from "./lines/slice";
@@ -62,9 +63,21 @@ function ParticleSystem({
     () => (wavesN > 0 ? createWaves(targets.waves, uniforms, PALETTE) : null),
     [targets, uniforms, wavesN],
   );
-  // halo rings ride the same tier gate as the waves (off on Low)
+  // halo rings (L5: dashed fat lines), spark plume and starfield ride the waves tier gate (off on Low)
   const hl = useMemo(
-    () => (wavesN > 0 ? createHalo(halo(4500, mulberry32(SEED + 8)), uniforms, PALETTE) : null),
+    () => (wavesN > 0 ? createHaloRings(uniforms, PALETTE) : null),
+    [uniforms, wavesN],
+  );
+  const sp = useMemo(() => {
+    if (wavesN === 0) return null;
+    const { points, seeds } = plumePoints(1500, mulberry32(SEED + 13));
+    return createSparks(points, seeds, uniforms, PALETTE);
+  }, [uniforms, wavesN]);
+  const st = useMemo(
+    () =>
+      wavesN > 0
+        ? createStarfield(starPoints(5000, mulberry32(SEED + 14)), uniforms, PALETTE)
+        : null,
     [uniforms, wavesN],
   );
   // wireframe bust (look v2, L1): contour loops as fat lines, fading in with the humanoid weight
@@ -93,7 +106,9 @@ function ParticleSystem({
   useEffect(() => {
     scene.add(sim.sprite);
     if (wv) scene.add(wv.sprite);
-    if (hl) scene.add(hl.sprite);
+    if (hl) scene.add(hl.mesh);
+    if (sp) scene.add(sp.sprite);
+    if (st) scene.add(st.sprite);
     if (lb) scene.add(lb.mesh);
     if (cf) scene.add(cf.sprite);
     scene.add(vn.mesh);
@@ -105,7 +120,9 @@ function ParticleSystem({
       cancelled = true;
       scene.remove(sim.sprite);
       if (wv) scene.remove(wv.sprite);
-      if (hl) scene.remove(hl.sprite);
+      if (hl) scene.remove(hl.mesh);
+      if (sp) scene.remove(sp.sprite);
+      if (st) scene.remove(st.sprite);
       if (lb) scene.remove(lb.mesh);
       if (cf) scene.remove(cf.sprite);
       scene.remove(vn.mesh);
@@ -113,10 +130,12 @@ function ParticleSystem({
       sim.dispose();
       wv?.dispose();
       hl?.dispose();
+      sp?.dispose();
+      st?.dispose();
       lb?.dispose();
       cf?.dispose();
     };
-  }, [sim, wv, hl, lb, cf, vn, scene, gl, onReady]);
+  }, [sim, wv, hl, sp, st, lb, cf, vn, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();
