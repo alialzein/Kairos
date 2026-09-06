@@ -1,11 +1,15 @@
 import {
+  abs,
   float,
   hash,
   instanceIndex,
   instancedArray,
   mix,
   mx_noise_float,
+  oneMinus,
   shapeCircle,
+  sin,
+  smoothstep,
   time,
   vec3,
   vec4,
@@ -32,7 +36,20 @@ export function createWaves(
     vec3(palette.particle.r, palette.particle.g, palette.particle.b),
     0.35,
   );
-  material.colorNode = vec4(tint.mul(u.brightness).mul(0.5), 1);
+  // Energy veins (avatar-polish T4): lightning-like streaks along noise iso-lines that flare
+  // in slow pseudo-random bursts, so the range reads as alive rather than static dust.
+  const veinField = oneMinus(abs(mx_noise_float(vec3(p.x.mul(0.4), p.z.mul(0.4), time.mul(0.05)))));
+  const vein = smoothstep(0.93, 1.0, veinField);
+  const flash = sin(time.mul(0.23))
+    .mul(sin(time.mul(0.37).add(2)))
+    .max(0)
+    .pow(4);
+  const veinGlow = vein.mul(flash).mul(3);
+  const veinColor = vec3(palette.particle.r, palette.particle.g, palette.particle.b);
+  material.colorNode = vec4(
+    tint.mul(u.brightness).mul(0.5).add(veinColor.mul(veinGlow).mul(u.brightness)),
+    1,
+  );
   // See sim/compute.ts: shapeCircle()'s .d.ts return type lacks the arithmetic proxy, so reify via float().
   material.opacityNode = float(shapeCircle() as unknown as Parameters<typeof float>[0]).mul(0.35);
   material.transparent = true;
