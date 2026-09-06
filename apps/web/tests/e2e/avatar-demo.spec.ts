@@ -16,4 +16,7 @@ test("a demo turn drives THINKING → SPEAKING → IDLE on the stage", async ({ 
   expect(log.indexOf("THINKING")).toBeLessThan(log.indexOf("SPEAKING"));
   await expect(page.locator("[data-ribbon] p").last()).toContainText("kairos:");
   await expect(page.locator("[data-status-ring=IDLE]")).toBeVisible();
+  // HUD chrome (look v2, L7) tracks the state
+  await expect(page.locator("[data-hud]")).toContainText("status: idle");
+  await expect(page.locator("[data-hud-assembling]")).toHaveCount(0);
 });

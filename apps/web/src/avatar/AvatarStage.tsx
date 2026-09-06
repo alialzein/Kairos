@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import { memo, useCallback, useRef, useState } from "react";
 import { identity } from "@twin/config";
+import { Hud } from "./Hud";
 import { StatusRing } from "./StatusRing";
 import { runDemoTurn } from "./demo/driver";
 import { playWakeCue } from "./audio/cue";
@@ -89,19 +90,22 @@ export function AvatarStage({ demo = false }: { demo?: boolean }) {
     <section
       data-theme="dark"
       data-state={state}
-      className="relative flex h-dvh w-full flex-col bg-twin-bg text-twin-fg"
+      className="relative flex h-dvh w-full flex-col overflow-hidden bg-twin-bg text-twin-fg"
     >
       <CanvasLayer onWake={wake} onReady={onReady} />
-      <header className="relative z-10 flex items-center justify-between p-4">
+      <header className="relative z-10 flex items-start justify-between p-4">
         <StatusRing state={state} />
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="rounded-full border border-white/20 px-3 py-1 text-xs"
-          aria-expanded={open}
-        >
-          {open ? "close" : "chat"}
-        </button>
+        <div className="flex items-start gap-4">
+          <Hud />
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="rounded-full border border-white/20 px-3 py-1 text-xs"
+            aria-expanded={open}
+          >
+            {open ? "close" : "chat"}
+          </button>
+        </div>
       </header>
       <div className="relative z-10 mt-auto space-y-1 p-4 font-mono text-sm" data-ribbon>
         {ribbon.length === 0 ? (
