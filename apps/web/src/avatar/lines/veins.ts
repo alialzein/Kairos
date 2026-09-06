@@ -21,7 +21,7 @@ export const CHEST_NODE: readonly [number, number, number] = [0, -0.25, 0.3];
 const Z_MIN = 0.28;
 const Z_MAX = 0.32;
 /** chest snowflake spoke length */
-export const NODE_R = 0.14;
+export const NODE_R = 0.17;
 
 interface Branch {
   pts: number[]; // flat xyz

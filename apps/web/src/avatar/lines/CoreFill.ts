@@ -1,5 +1,5 @@
 import { float, mix, smoothstep, uv, vec3, vec4 } from "three/tsl";
-import { AdditiveBlending, Sprite, SpriteNodeMaterial, Vector3 } from "three/webgpu";
+import { AdditiveBlending, Sprite, SpriteNodeMaterial } from "three/webgpu";
 import { ANCHORS } from "../sim/canonical";
 import type { Palette } from "../sim/palette";
 import type { SimUniforms } from "../sim/uniforms";

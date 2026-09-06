@@ -26,7 +26,7 @@ export function createVeinLines(tree: VeinTree, u: SimUniforms, palette: Palette
   geometry.setAttribute("segGen", new InstancedBufferAttribute(tree.segGen, 1));
 
   const material = new Line2NodeMaterial({
-    linewidth: 2.3,
+    linewidth: 2.8,
     worldUnits: false,
     dashed: true,
     dashSize: 0.07,

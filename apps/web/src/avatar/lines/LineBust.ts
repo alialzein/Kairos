@@ -25,10 +25,9 @@ import {
 } from "three/webgpu";
 import { ANCHORS } from "../sim/canonical";
 import type { UniformValues } from "../sim/frame";
-import { jawOffset, jawOpen } from "../sim/jaw";
-import { makeNoise } from "../sim/noise";
 import type { Palette } from "../sim/palette";
 import type { SimUniforms } from "../sim/uniforms";
+import { createLineDeformer } from "./deform";
 import type { Contours } from "./slice";
 
 export interface LineBust {
@@ -43,8 +42,7 @@ const c3 = (c: { r: number; g: number; b: number }) => vec3(c.r, c.g, c.b);
 /** Wireframe bust: the sliced contour loops drawn as fat lines.
  *  Colour/opacity/reveal are TSL; the fat-line material derives its vertices from the
  *  instanceStart/instanceEnd interleaved buffer, so geometry animation is a CPU rewrite of that
- *  buffer from the base positions, restricted to per-region index sets so idle frames cost
- *  nothing and THINKING (head twist) touches only the head. */
+ *  buffer (lines/deform.ts). */
 export function createLineBust(contours: Contours, u: SimUniforms, palette: Palette): LineBust {
   const geometry = new LineSegmentsGeometry();
   geometry.setPositions(contours.segments);
@@ -119,126 +117,14 @@ export function createLineBust(contours: Contours, u: SimUniforms, palette: Pale
   const mesh = new LineSegments2(geometry, material);
   mesh.frustumCulled = false;
 
-  // ---- CPU deformation ------------------------------------------------------------------
+  // ---- CPU deformation (lines/deform.ts) ------------------------------------------------
+  // the interleaved buffer wraps contours.segments itself (setPositions does not copy), so the
+  // deformer snapshots its own base and rewrites the live array per frame
   const startAttr = geometry.getAttribute("instanceStart") as InterleavedBufferAttribute;
   const buffer = startAttr.data as InterleavedBuffer;
-  const live = buffer.array as Float32Array;
-  const baseSeg = contours.segments; // never mutated
-  const vertexCount = baseSeg.length / 3; // each segment endpoint is a "vertex" at offset i*3
-  // per-region vertex index sets, from base positions
-  const mouthSet: number[] = [];
-  const earSet: number[] = [];
-  const headSet: number[] = [];
-  for (let i = 0; i < vertexCount; i++) {
-    const x = baseSeg[i * 3] ?? 0,
-      y = baseSeg[i * 3 + 1] ?? 0,
-      z = baseSeg[i * 3 + 2] ?? 0;
-    const dm = Math.hypot(x - ANCHORS.mouth[0], y - ANCHORS.mouth[1], z - ANCHORS.mouth[2]);
-    if (dm < 0.3 && y - ANCHORS.mouth[1] < 0.05) mouthSet.push(i);
-    const dl = Math.hypot(x - ANCHORS.earL[0], y - ANCHORS.earL[1], z - ANCHORS.earL[2]);
-    const dr = Math.hypot(x - ANCHORS.earR[0], y - ANCHORS.earR[1], z - ANCHORS.earR[2]);
-    if (Math.min(dl, dr) < 0.4) earSet.push(i);
-    if (y > 0.2) headSet.push(i);
-  }
-  const noise = makeNoise(23);
-  // vertices written last frame — restored from base before this frame's effects are applied,
-  // so no effect can outlive its state (no per-effect bookkeeping to get wrong)
-  const touched = new Uint8Array(vertexCount);
-  let touchedAny = false;
-
-  const write = (i: number, x: number, y: number, z: number): void => {
-    live[i * 3] = x;
-    live[i * 3 + 1] = y;
-    live[i * 3 + 2] = z;
-    touched[i] = 1;
-  };
-
+  const deformer = createLineDeformer(buffer.array as Float32Array);
   const update = (_dt: number, v: UniformValues, timeS: number): void => {
-    const open = jawOpen(timeS, v.speak);
-    const wantJaw = open > 0.002;
-    const wantEar = v.listen > 0.01;
-    const wantHead = v.vortex > 0.01;
-    // OFFLINE: fray while frozen/dissolving (freeze = 1 during the hold, tint red afterwards)
-    const fray = v.freeze > 0 ? 0.02 : v.tint[0] > 0.9 && v.tint[2] < 0.6 ? 0.045 : 0;
-    const wantFray = fray > 0;
-    let dirty = false;
-
-    if (touchedAny) {
-      for (let i = 0; i < vertexCount; i++) {
-        if (touched[i]) {
-          live[i * 3] = baseSeg[i * 3] ?? 0;
-          live[i * 3 + 1] = baseSeg[i * 3 + 1] ?? 0;
-          live[i * 3 + 2] = baseSeg[i * 3 + 2] ?? 0;
-          touched[i] = 0;
-        }
-      }
-      touchedAny = false;
-      dirty = true;
-    }
-
-    if (wantFray) {
-      // fray touches everything: noise displacement from base
-      for (let i = 0; i < vertexCount; i++) {
-        const x = baseSeg[i * 3] ?? 0,
-          y = baseSeg[i * 3 + 1] ?? 0,
-          z = baseSeg[i * 3 + 2] ?? 0;
-        const n = noise(x * 5 + timeS * 0.8, y * 5, z * 5);
-        write(
-          i,
-          x + n * fray,
-          y + noise(y * 5, z * 5 + timeS * 0.6, x * 5) * fray,
-          z + n * fray * 0.5,
-        );
-      }
-      touchedAny = true;
-      dirty = true;
-    } else {
-      // thinking twist: rotate the head around the vertical axis, more with height
-      if (wantHead) {
-        const k = v.vortex * 0.35;
-        for (const i of headSet) {
-          const x = baseSeg[i * 3] ?? 0,
-            y = baseSeg[i * 3 + 1] ?? 0,
-            z = baseSeg[i * 3 + 2] ?? 0;
-          const a = (y - 0.2) * k * Math.sin(timeS * 1.3);
-          const c = Math.cos(a),
-            sn = Math.sin(a);
-          write(i, x * c - z * sn, y, x * sn + z * c);
-        }
-        touchedAny = true;
-        dirty = true;
-      }
-      // listen ripple: radial waves from the nearer ear (on top of whatever is already written)
-      if (wantEar) {
-        for (const i of earSet) {
-          const x = live[i * 3] ?? 0,
-            y = live[i * 3 + 1] ?? 0,
-            z = live[i * 3 + 2] ?? 0;
-          const ear = x < 0 ? ANCHORS.earL : ANCHORS.earR;
-          const dx = x - ear[0],
-            dy = y - ear[1],
-            dz = z - ear[2];
-          const d = Math.hypot(dx, dy, dz) || 1;
-          const amp = 0.012 * v.listen * Math.max(0, 1 - d / 0.4) * Math.sin(d * 40 - timeS * 8);
-          write(i, x + (dx / d) * amp, y + (dy / d) * amp, z + (dz / d) * amp);
-        }
-        touchedAny = true;
-        dirty = true;
-      }
-      // jaw: shared formula with the particle kernel (from base — the mouth is never twisted)
-      if (wantJaw) {
-        for (const i of mouthSet) {
-          const x = baseSeg[i * 3] ?? 0,
-            y = baseSeg[i * 3 + 1] ?? 0,
-            z = baseSeg[i * 3 + 2] ?? 0;
-          const [ox, oy, oz] = jawOffset(x, y, z, open);
-          write(i, x + ox, y + oy, z + oz);
-        }
-        touchedAny = true;
-        dirty = true;
-      }
-    }
-    if (dirty) buffer.needsUpdate = true;
+    if (deformer.update(v, timeS)) buffer.needsUpdate = true;
   };
 
   return {
