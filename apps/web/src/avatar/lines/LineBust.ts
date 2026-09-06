@@ -1,6 +1,17 @@
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js";
-import { attribute, float, length, mix, sin, smoothstep, time, uniform, vec3 } from "three/tsl";
+import {
+  attribute,
+  float,
+  length,
+  mix,
+  sin,
+  smoothstep,
+  step,
+  time,
+  uniform,
+  vec3,
+} from "three/tsl";
 import {
   AdditiveBlending,
   InstancedBufferAttribute,
@@ -79,7 +90,15 @@ export function createLineBust(contours: Contours, u: SimUniforms, palette: Pale
     .mul(1.5)
     .mul(wave)
     .mul(float(1).sub(coreGlow.mul(0.35)));
+  // accessories (glasses loops, segSlice = -1) sit brighter and whiter than the contour mesh so
+  // they read through the dense lines and the orange fill
+  const accessory = step(float(-0.5), segSlice.negate()); // 1 when segSlice < 0
   material.opacityNode = u.shade.mul(0.92);
+  material.colorNode = mix(
+    material.colorNode as unknown as Node<"vec3">,
+    vec3(0.85, 0.97, 1).mul(u.brightness).mul(2.2),
+    accessory,
+  );
 
   const mesh = new LineSegments2(geometry, material);
   mesh.frustumCulled = false;

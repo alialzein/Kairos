@@ -20,6 +20,7 @@ import { halo } from "./sim/targets/halo";
 import { mulberry32 } from "./sim/random";
 import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
+import { appendPolylines, glassesPolylines, liftMesh } from "./lines/likenessMesh";
 import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
 
@@ -257,17 +258,23 @@ export function AvatarCanvas({
     if (!tier) return;
     let cancelled = false;
     setTier(tier);
-    void loadBust().then((bust) => {
+    void loadBust().then((raw) => {
       if (cancelled) return;
+      // likeness (L3): the hairstyle lives on the mesh so lines and particles agree; the glasses
+      // are appended to the contour set as real line loops
+      const bust = liftMesh(raw);
       setContours(
         (prev) =>
           prev ??
-          sliceMesh(bust.positions, bust.indices, {
-            count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
-            yMin: -0.9,
-            yMax: 0.9,
-            spacing: 0.012,
-          }),
+          appendPolylines(
+            sliceMesh(bust.positions, bust.indices, {
+              count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
+              yMin: -0.9,
+              yMax: 0.9,
+              spacing: 0.012,
+            }),
+            glassesPolylines(),
+          ),
       );
       setTargets((prev) =>
         prev && prev.n >= TIERS[tier].particles
