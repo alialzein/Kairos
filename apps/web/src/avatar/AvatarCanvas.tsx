@@ -20,7 +20,9 @@ import { halo } from "./sim/targets/halo";
 import { mulberry32 } from "./sim/random";
 import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
-import { appendPolylines, glassesPolylines, liftMesh } from "./lines/likenessMesh";
+import { createVeinLines } from "./lines/VeinLines";
+import { chestNode, mergeTrees, spineTree } from "./lines/veins";
+import { liftMesh } from "./lines/likenessMesh";
 import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
 
@@ -74,6 +76,16 @@ function ParticleSystem({
     () => (contours ? createCoreFill(uniforms, PALETTE) : null),
     [contours, uniforms],
   );
+  // energy veins (L4): spine tree + chest node, orange dashed pulses
+  const vn = useMemo(
+    () =>
+      createVeinLines(
+        mergeTrees([spineTree(mulberry32(SEED + 11)), chestNode(mulberry32(SEED + 12))]),
+        uniforms,
+        PALETTE,
+      ),
+    [uniforms],
+  );
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
@@ -84,6 +96,7 @@ function ParticleSystem({
     if (hl) scene.add(hl.sprite);
     if (lb) scene.add(lb.mesh);
     if (cf) scene.add(cf.sprite);
+    scene.add(vn.mesh);
     let cancelled = false;
     void gl.computeAsync(sim.init).then(() => {
       if (!cancelled) onReady();
@@ -95,13 +108,15 @@ function ParticleSystem({
       if (hl) scene.remove(hl.sprite);
       if (lb) scene.remove(lb.mesh);
       if (cf) scene.remove(cf.sprite);
+      scene.remove(vn.mesh);
+      vn.dispose();
       sim.dispose();
       wv?.dispose();
       hl?.dispose();
       lb?.dispose();
       cf?.dispose();
     };
-  }, [sim, wv, hl, lb, cf, scene, gl, onReady]);
+  }, [sim, wv, hl, lb, cf, vn, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();
@@ -260,21 +275,19 @@ export function AvatarCanvas({
     setTier(tier);
     void loadBust().then((raw) => {
       if (cancelled) return;
-      // likeness (L3): the hairstyle lives on the mesh so lines and particles agree; the glasses
-      // are appended to the contour set as real line loops
+      // likeness (L3): the hairstyle lives on the mesh so lines and particles agree. Glasses are
+      // deliberately OFF (Ali, 2026-09-06: "remove the glasses, I didn't like it") — the
+      // generator stays in lines/likenessMesh.ts should he want them back.
       const bust = liftMesh(raw);
       setContours(
         (prev) =>
           prev ??
-          appendPolylines(
-            sliceMesh(bust.positions, bust.indices, {
-              count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
-              yMin: -0.9,
-              yMax: 0.9,
-              spacing: 0.012,
-            }),
-            glassesPolylines(),
-          ),
+          sliceMesh(bust.positions, bust.indices, {
+            count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
+            yMin: -0.9,
+            yMax: 0.9,
+            spacing: 0.012,
+          }),
       );
       setTargets((prev) =>
         prev && prev.n >= TIERS[tier].particles
