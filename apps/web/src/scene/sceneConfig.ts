@@ -131,7 +131,14 @@ export interface SceneConfig {
     amplitude: number;
     dropout: number;
     goldRatio: number;
+    /** PointsMaterial units (px = size · H/2 / depth); converted to a sprite size at render time */
     pointSize: number;
+    pointOpacity: number;
+    blueOpacity: number;
+    goldOpacity: number;
+    /** simplex noise seed for the ridges and rng seed for the edge dropout */
+    noiseSeed: number;
+    seed: number;
   };
   post: {
     bloomIntensity: number;
@@ -254,6 +261,11 @@ export const sceneConfig: SceneConfig = {
     dropout: 0.35,
     goldRatio: 0.1,
     pointSize: 0.025,
+    pointOpacity: 0.8,
+    blueOpacity: 0.35,
+    goldOpacity: 0.8,
+    noiseSeed: 7,
+    seed: 11,
   },
 
   post: { bloomIntensity: 1.3, bloomThreshold: 0.55, bloomSmoothing: 0.3, vignetteDarkness: 0.7 },
