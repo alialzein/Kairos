@@ -8,6 +8,9 @@ import { useAvatarStore } from "@/avatar/state/store";
 const AvatarCanvas = dynamic(() => import("@/avatar/AvatarCanvas").then((m) => m.AvatarCanvas), {
   ssr: false,
 });
+const AvatarStage = dynamic(() => import("@/avatar/AvatarStage").then((m) => m.AvatarStage), {
+  ssr: false,
+});
 
 declare global {
   interface Window {
@@ -70,13 +73,12 @@ export function BenchAvatar({
     };
   }, []);
 
-  return (
-    <main
-      data-theme="dark"
-      data-bench="avatar"
-      data-demo={demo ? "1" : "0"}
-      className="fixed inset-0 bg-twin-bg"
-    >
+  return demo ? (
+    <main data-theme="dark" data-bench="avatar" data-demo="1">
+      <AvatarStage demo />
+    </main>
+  ) : (
+    <main data-theme="dark" data-bench="avatar" data-demo="0" className="fixed inset-0 bg-twin-bg">
       <AvatarCanvas
         tier={forced}
         forceWebGL={webgl}
