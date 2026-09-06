@@ -18,6 +18,8 @@ import { createWaves } from "./sim/wavesSystem";
 import { createHalo } from "./sim/haloSystem";
 import { halo } from "./sim/targets/halo";
 import { mulberry32 } from "./sim/random";
+import { createLineBust } from "./lines/LineBust";
+import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
 
 export interface AvatarCanvasProps {
@@ -36,11 +38,13 @@ const PROBE_S = 2;
 
 function ParticleSystem({
   targets,
+  contours,
   tier,
   onReady,
   onAberration,
 }: {
   targets: Targets;
+  contours: Contours | null;
   tier: Tier;
   onReady: () => void;
   onAberration: (v: number) => void;
@@ -59,6 +63,11 @@ function ParticleSystem({
     () => (wavesN > 0 ? createHalo(halo(4500, mulberry32(SEED + 8)), uniforms, PALETTE) : null),
     [uniforms, wavesN],
   );
+  // wireframe bust (look v2, L1): contour loops as fat lines, fading in with the humanoid weight
+  const lb = useMemo(
+    () => (contours ? createLineBust(contours, uniforms, PALETTE) : null),
+    [contours, uniforms],
+  );
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
@@ -67,6 +76,7 @@ function ParticleSystem({
     scene.add(sim.sprite);
     if (wv) scene.add(wv.sprite);
     if (hl) scene.add(hl.sprite);
+    if (lb) scene.add(lb.mesh);
     let cancelled = false;
     void gl.computeAsync(sim.init).then(() => {
       if (!cancelled) onReady();
@@ -76,11 +86,13 @@ function ParticleSystem({
       scene.remove(sim.sprite);
       if (wv) scene.remove(wv.sprite);
       if (hl) scene.remove(hl.sprite);
+      if (lb) scene.remove(lb.mesh);
       sim.dispose();
       wv?.dispose();
       hl?.dispose();
+      lb?.dispose();
     };
-  }, [sim, wv, hl, scene, gl, onReady]);
+  }, [sim, wv, hl, lb, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();
@@ -197,6 +209,8 @@ export function AvatarCanvas({
     return override ?? baseTier(readSignals(navigator, window));
   });
   const [targets, setTargets] = useState<Targets | null>(null);
+  // tier-independent, built once from the bust mesh
+  const [contours, setContours] = useState<Contours | null>(null);
   const [frameloop, setFrameloop] = useState<"always" | "never">("always");
   const setTier = useAvatarStore((s) => s.setTier);
   const setBackend = useAvatarStore((s) => s.setBackend);
@@ -224,7 +238,7 @@ export function AvatarCanvas({
       });
       await renderer.init();
       setBackend("isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl");
-      renderer.setClearColor(new Color("#05070d"), 1);
+      renderer.setClearColor(new Color("#050a18"), 1);
       return renderer;
     },
     [forceWebGL, setBackend],
@@ -237,6 +251,16 @@ export function AvatarCanvas({
     setTier(tier);
     void loadBust().then((bust) => {
       if (cancelled) return;
+      setContours(
+        (prev) =>
+          prev ??
+          sliceMesh(bust.positions, bust.indices, {
+            count: 120, // full mesh height (bounds y ±0.9) at ~0.015 spacing, like the reference
+            yMin: -0.9,
+            yMax: 0.9,
+            spacing: 0.012,
+          }),
+      );
       setTargets((prev) =>
         prev && prev.n >= TIERS[tier].particles
           ? strided(prev, TIERS[tier].particles)
@@ -281,6 +305,7 @@ export function AvatarCanvas({
       >
         <ParticleSystem
           targets={targets}
+          contours={contours}
           tier={tier}
           onReady={handleReady}
           onAberration={setAberration}
