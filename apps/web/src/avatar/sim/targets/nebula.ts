@@ -1,23 +1,34 @@
-import { curl, makeNoise } from "../noise";
 import { randomInSphere, type Rng } from "../random";
 
-/** Curl-noise scattered volume (DORMANT / OFFLINE). */
+const ARMS = 3;
+const RADIUS = 1.55;
+const TILT = -0.5; // radians around x: tips the disc toward the camera so it reads as 3D
+
+/** "Sleeping galaxy" (DORMANT / OFFLINE): flattened three-arm spiral disc + sparse halo.
+ *  Replaced the old shapeless curl-noise ball — Ali: "dormant shape is very poor". */
 export function nebula(n: number, rng: Rng): Float32Array {
-  const noise = makeNoise(11);
   const out = new Float32Array(n * 3);
+  const discN = Math.floor(n * 0.88);
+  const cosT = Math.cos(TILT);
+  const sinT = Math.sin(TILT);
   for (let i = 0; i < n; i++) {
-    const [x, y, z] = randomInSphere(rng, 1.25);
-    const [cx, cy, cz] = curl(noise, x * 0.9, y * 0.9, z * 0.9);
-    // curl() returns raw (unbounded) finite-difference derivatives; normalize to a unit flow
-    // direction before scaling, so the displacement stays bounded (|P| <= 1.25, |0.3*u| <= 0.3
-    // by triangle inequality) regardless of the underlying noise field's local slope.
-    const clen = Math.hypot(cx, cy, cz) || 1;
-    const ux = cx / clen,
-      uy = cy / clen,
-      uz = cz / clen;
-    out[i * 3] = x + ux * 0.3;
-    out[i * 3 + 1] = y * 0.8 + uy * 0.3;
-    out[i * 3 + 2] = z + uz * 0.3;
+    let x: number, y: number, z: number;
+    if (i < discN) {
+      // dense centre, arms twist ~2.3 rad over the radius, jitter widens outward
+      const r = RADIUS * Math.pow(rng(), 0.62);
+      const arm = (i % ARMS) * ((Math.PI * 2) / ARMS);
+      const jitter = (rng() + rng() + rng() - 1.5) * (0.18 + 0.5 * (r / RADIUS));
+      const theta = arm + (r / RADIUS) * 2.3 + jitter;
+      const thickness = (rng() + rng() + rng() - 1.5) * 0.09 * (0.4 + r / RADIUS);
+      x = r * Math.cos(theta);
+      y = thickness;
+      z = r * Math.sin(theta);
+    } else {
+      [x, y, z] = randomInSphere(rng, 1.3);
+    }
+    out[i * 3] = x;
+    out[i * 3 + 1] = y * cosT - z * sinT;
+    out[i * 3 + 2] = y * sinT + z * cosT;
   }
   return out;
 }
