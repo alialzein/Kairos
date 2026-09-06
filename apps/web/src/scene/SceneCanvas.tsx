@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ACESFilmicToneMapping, Color, SRGBColorSpace } from "three";
 import { FrameStats } from "@/avatar/telemetry/frametime";
+import { Background } from "./Background";
 import { Bust } from "./Bust";
 import { Effects } from "./Effects";
 import { FaceCore } from "./FaceCore";
@@ -105,6 +106,7 @@ export function SceneCanvas({
     >
       <Canvas dpr={[1, 2]} camera={{ position, fov, near, far }} gl={makeRenderer}>
         <SceneCamera />
+        {layers.background ? <Background /> : null}
         {layers.stars ? <Stars /> : null}
         {layers.bust ? <Bust contours={layers.contours} /> : null}
         {layers.core ? <FaceCore /> : null}

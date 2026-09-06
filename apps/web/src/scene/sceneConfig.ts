@@ -11,6 +11,7 @@
 export type Vec3 = [number, number, number];
 
 export const LAYER_NAMES = [
+  "background",
   "stars",
   "bust",
   "contours",
@@ -92,10 +93,24 @@ export interface SceneConfig {
     bloomSmoothing: number;
     vignetteDarkness: number;
   };
+  /** Phase 1 starfield. Adapted from drei `<Stars radius depth count factor>`: stars are placed
+   *  inside the camera's view cone (not a full sphere) so `count` is the number actually on
+   *  screen, and `size` is a world-space sprite size at `radius` (≈ 2 px at 800 px tall). */
+  stars: {
+    count: number;
+    radius: number;
+    depth: number;
+    size: number;
+    opacity: number;
+    /** widest aspect ratio the cone must cover */
+    aspect: number;
+    seed: number;
+  };
 }
 
 export const sceneConfig: SceneConfig = {
   layers: {
+    background: true,
     stars: true,
     bust: true,
     contours: true,
@@ -164,4 +179,6 @@ export const sceneConfig: SceneConfig = {
   },
 
   post: { bloomIntensity: 1.3, bloomThreshold: 0.55, bloomSmoothing: 0.3, vignetteDarkness: 0.7 },
+
+  stars: { count: 400, radius: 60, depth: 20, size: 0.08, opacity: 0.3, aspect: 2.2, seed: 2026 },
 };

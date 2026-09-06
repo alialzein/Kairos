@@ -2,6 +2,7 @@ import { LAYER_NAMES, sceneConfig, type LayerName, type Layers } from "./sceneCo
 
 /** The plan phase in which each layer first appears (docs/plans/scene-plan.md, component tree). */
 export const LAYER_PHASE: Record<LayerName, number> = {
+  background: 1,
   stars: 1,
   bust: 2,
   contours: 3,
