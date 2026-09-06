@@ -87,7 +87,30 @@ export interface SceneConfig {
      *  (the mesh's nose tip is at z ≈ 0.61), centre alpha */
     glow: { size: number; z: number; alpha: number };
   };
-  neck: { jawY: number; jawXs: number[]; nodeY: number; lineWidth: number };
+  neck: {
+    jawY: number;
+    jawXs: number[];
+    nodeY: number;
+    /** y of each strand's bezier control point (plan: 0.75, between jaw and node) */
+    controlY: number;
+    /** fat-line width in CSS px (drei <Line lineWidth>) */
+    lineWidth: number;
+    opacity: number;
+    /** how far in front of the neck cylinder the strands sit (plan: 0.02) */
+    lift: number;
+    /** samples per strand (plan: 40) */
+    points: number;
+    /** sternum node: cluster points + spread, radiating spokes + length, point size in
+     *  PointsMaterial units (plan: 0.02; converted to a sprite size at render time) */
+    node: {
+      points: number;
+      spread: number;
+      spokes: number;
+      spokeLength: number;
+      pointSize: number;
+    };
+    seed: number;
+  };
   rings: {
     center: Vec3;
     count: number;
@@ -193,7 +216,21 @@ export const sceneConfig: SceneConfig = {
     glow: { size: 0.9, z: 0.72, alpha: 0.9 },
   },
 
-  neck: { jawY: 1.02, jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22], nodeY: 0.42, lineWidth: 1.5 },
+  // plan: jawY 1.02 / controlY 0.75 / nodeY 0.42 for the sphere-head bust. On the mesh the chin
+  // bottom is at y ≈ 0.89 and the sternum notch at ≈ 0.12, so the strands start under the jaw at
+  // 0.95, converge at 0.15, and the control point keeps the plan's 45 % position between them.
+  neck: {
+    jawY: 0.95,
+    jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22],
+    nodeY: 0.15,
+    controlY: 0.59,
+    lineWidth: 1.5,
+    opacity: 0.9,
+    lift: 0.02,
+    points: 40,
+    node: { points: 10, spread: 0.03, spokes: 6, spokeLength: 0.05, pointSize: 0.02 },
+    seed: 5,
+  },
 
   rings: {
     center: [0, 1.45, -1.3],
