@@ -215,7 +215,13 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     coreColor,
     select(role.equal(1), spineColor, mainColor.mul(float(1).add(faceGlow))),
   );
-  material.colorNode = vec4(color.mul(u.brightness).mul(u.tint), 1);
+  // Energy conservation across tiers: the cloud is additive, so at high particle counts thousands
+  // of overlapping sprites sum past white and erase all colour texture (ultra looked like a white
+  // blob while mid kept its blues). Scale per-particle light so total emitted light stays roughly
+  // constant relative to the mid tier; core/spine keep full brightness so the amber still reads.
+  const densityScale = Math.min(1, Math.max(0.3, Math.sqrt(60_000 / n)));
+  const perParticle = select(role.equal(2), float(densityScale), float(1));
+  material.colorNode = vec4(color.mul(u.brightness).mul(u.tint).mul(perParticle), 1);
   // shapeCircle() is typed as the bare `Node` (no "float" literal type param) in @types/three 0.185.4,
   // so it is missing the arithmetic proxy methods (.mul etc.) that every other TSL scalar carries.
   // Reify it through float() (a real scalar node) to restore them; runtime shape is identical.
