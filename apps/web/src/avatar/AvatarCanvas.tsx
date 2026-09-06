@@ -18,6 +18,7 @@ import { createWaves } from "./sim/wavesSystem";
 import { createHalo } from "./sim/haloSystem";
 import { halo } from "./sim/targets/halo";
 import { mulberry32 } from "./sim/random";
+import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
 import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
@@ -68,6 +69,10 @@ function ParticleSystem({
     () => (contours ? createLineBust(contours, uniforms, PALETTE) : null),
     [contours, uniforms],
   );
+  const cf = useMemo(
+    () => (contours ? createCoreFill(uniforms, PALETTE) : null),
+    [contours, uniforms],
+  );
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
@@ -77,6 +82,7 @@ function ParticleSystem({
     if (wv) scene.add(wv.sprite);
     if (hl) scene.add(hl.sprite);
     if (lb) scene.add(lb.mesh);
+    if (cf) scene.add(cf.sprite);
     let cancelled = false;
     void gl.computeAsync(sim.init).then(() => {
       if (!cancelled) onReady();
@@ -87,12 +93,14 @@ function ParticleSystem({
       if (wv) scene.remove(wv.sprite);
       if (hl) scene.remove(hl.sprite);
       if (lb) scene.remove(lb.mesh);
+      if (cf) scene.remove(cf.sprite);
       sim.dispose();
       wv?.dispose();
       hl?.dispose();
       lb?.dispose();
+      cf?.dispose();
     };
-  }, [sim, wv, hl, lb, scene, gl, onReady]);
+  }, [sim, wv, hl, lb, cf, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();

@@ -258,8 +258,11 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   // The head core ball (first 60 % of core particles, docs/06 §2) sits at eye level inside the
   // skull; additive blending ignores occlusion, so at full brightness it floods the face. Dim it
   // hard while humanoid, keep the chest core hot so the amber still reads through the torso.
+  // Look v2: while the line bust is up its orange striations ARE the core, so the particle
+  // lamps (crown/throat) and the spine column step far back — they were blowing the face to white.
   const isHeadCore = float(instanceIndex).lessThan(u.coreEnd.mul(0.6));
-  const coreDim = mix(float(1), select(isHeadCore, float(0.15), float(0.8)), u.shade);
+  const coreDim = mix(float(1), select(isHeadCore, float(0.04), float(0.1)), u.shade);
+  const spineDim = mix(float(1), float(0.1), u.shade);
   // Defined eyes: darken the socket bowl around each measured eye anchor and light a small
   // cool pupil at its centre — both gated by shade so non-humanoid shapes are untouched.
   const dEye = length(posAttr.sub(eyeL)).min(length(posAttr.sub(eyeR)));
@@ -282,7 +285,7 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     coreColor.mul(coreDim),
     select(
       role.equal(1),
-      spineColor,
+      spineColor.mul(spineDim),
       mainColor
         .mul(float(1).add(faceGlow))
         .mul(lit)
@@ -304,7 +307,9 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   const circleMask = float(shapeCircle() as unknown as Parameters<typeof float>[0]);
   // Look v2: while the bust is assembled the fat-line layer carries it; main-particle dust dims
   // to 25 % underneath (a few sparks remain, as in the reference). Core/spine keep their alpha.
-  const dustDim = select(role.equal(2), oneMinus(u.shade.mul(0.75)), float(1));
+  // core lamps + spine sprites fade OUT with the line bust (their stacked sprites cross the bloom
+  // threshold even at a few % colour, and the reference has no lamps — the vein lines take over)
+  const dustDim = select(role.equal(2), oneMinus(u.shade.mul(0.85)), oneMinus(u.shade));
   material.opacityNode = circleMask
     .mul(u.alpha)
     .mul(select(role.equal(0), float(1), float(0.7)))
