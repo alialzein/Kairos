@@ -44,6 +44,21 @@ export interface SceneConfig {
     landscape: string;
   };
   bust: {
+    /** "glb": the repo's smooth bust mesh (preferred per the plan); "primitives": sphere + cylinder
+     *  + ellipsoid + box fallback built from the values below */
+    source: "glb" | "primitives";
+    /** canonical bust space (y ∈ [−0.9, 0.9], head ≈ 0.75 tall) → scene units; the jagged
+     *  cropped-arm boundary below `skirtBelow` is pulled down to `skirtTo` (canonical y) */
+    glb: {
+      url: string;
+      scale: number;
+      offset: Vec3;
+      /** boundary vertices with |x| > xMin and y ∈ [yMin, yMax] are the jagged upper-arm crops,
+       *  straightened onto one slanted line per side */
+      armCrop: { xMin: number; yMin: number; yMax: number };
+      skirtBelow: number;
+      skirtTo: number;
+    };
     headCenter: Vec3;
     headRadius: number;
     headScaleY: number;
@@ -136,6 +151,16 @@ export const sceneConfig: SceneConfig = {
   },
 
   bust: {
+    source: "glb",
+    // scale 1.6: head 0.75 → 1.2 tall; offset: head centre (0, 0.5) → (0, 1.45), face front z ≈ 0.5
+    glb: {
+      url: "/avatar/bust.glb",
+      scale: 1.6,
+      offset: [0, 0.65, -0.2],
+      armCrop: { xMin: 0.6, yMin: -0.89, yMax: -0.2 },
+      skirtBelow: -0.75,
+      skirtTo: -1.6,
+    },
     headCenter: [0, 1.45, 0],
     headRadius: 0.5,
     headScaleY: 1.2,
