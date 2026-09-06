@@ -35,6 +35,7 @@ import {
 } from "three/webgpu";
 import { SHAPE_ID } from "@twin/config";
 import { ANCHORS } from "./canonical";
+import { JAW } from "./jaw";
 import { packRegionSpine, packShape } from "./pack";
 import type { Palette } from "./palette";
 import type { Targets } from "./targets";
@@ -164,13 +165,15 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     // SPEAKING: the jaw talks — the region below the mouth anchor drops down-and-forward with
     // an open/close oscillation scaled by speech energy. Displacing the TARGET (not a force)
     // keeps the chin moving as one coherent piece instead of churning particles into fuzz.
+    // constants shared with the line bust's CPU updater (sim/jaw.ts) so dust and wireframe
+    // move as one mouth
     const dm = target.sub(mouthAnchor);
-    const open = u.speak.mul(sin(time.mul(9)).mul(0.5).add(0.5));
+    const open = u.speak.mul(sin(time.mul(JAW.rate)).mul(0.5).add(0.5));
     const jawDrop = open
-      .mul(0.09)
-      .mul(smoothstep(0.26, 0.06, length(dm)))
-      .mul(smoothstep(0.03, -0.05, dm.y));
-    target.addAssign(vec3(0, jawDrop.negate(), jawDrop.mul(0.3)));
+      .mul(JAW.drop)
+      .mul(smoothstep(JAW.rOuter, JAW.rInner, length(dm)))
+      .mul(smoothstep(JAW.yTop, JAW.yBot, dm.y));
+    target.addAssign(vec3(0, jawDrop.negate(), jawDrop.mul(JAW.forward)));
 
     const dt = deltaTime.min(0.033);
     const flow = mx_noise_vec3(
