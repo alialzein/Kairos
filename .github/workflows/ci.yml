@@ -2,6 +2,12 @@ name: ci
 on:
   push: { branches: ["**"] }
   pull_request: {}
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "record tests/perf/baseline.ci.json from this run"
+        type: boolean
+        default: false
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -87,3 +93,31 @@ jobs:
       - run: supabase test db
       - if: always()
         run: supabase stop --no-backup
+
+  avatar:
+    name: avatar · e2e + frame-time (Playwright, SwiftShader)
+    runs-on: ubuntu-latest
+    env:
+      UPDATE_BASELINE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_baseline == true && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @twin/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @twin/web build
+      - run: pnpm --filter @twin/web test:e2e
+      - if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: avatar-perf
+          path: |
+            apps/web/test-results/perf.json
+            apps/web/playwright-report
+          if-no-files-found: ignore
+      - if: env.UPDATE_BASELINE == '1'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: avatar-baseline
+          path: apps/web/tests/perf/baseline.ci.json
