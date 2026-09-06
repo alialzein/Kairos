@@ -1,7 +1,8 @@
 "use client";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { ACESFilmicToneMapping, Color, SRGBColorSpace } from "three";
+import { Color } from "three";
+import type { WebGPURenderer } from "three/webgpu";
 import { FrameStats } from "@/avatar/telemetry/frametime";
 import { Background } from "./Background";
 import { Bust } from "./Bust";
@@ -59,6 +60,9 @@ function FrameTicker({ onReady }: { onReady?: () => void }) {
 
 const gradient = `linear-gradient(180deg, ${sceneConfig.palette.bgTop} 0%, ${sceneConfig.palette.bgBottom} 100%)`;
 
+/** one renderer per canvas element, shared by any re-entrant factory call (see makeRenderer) */
+const inflight = new WeakMap<HTMLCanvasElement, Promise<WebGPURenderer>>();
+
 /**
  * The "Neural Bust" scene (docs/plans/scene-plan.md): the plan's component tree inside one R3F
  * Canvas, each child gated by a layer flag, plus the DOM HUD beside it.
@@ -76,23 +80,34 @@ export function SceneCanvas({
 }: SceneCanvasProps) {
   const layers = useMemo<Layers>(() => ({ ...sceneConfig.layers, ...overrides }), [overrides]);
 
+  // The awaited factory is the window in which any re-render of this component makes R3F run it
+  // again (R3F configure re-enters while state.gl is unset). Two guards: the factory is
+  // idempotent per canvas (a second call joins the in-flight promise), and it writes nothing to
+  // React or the store before it returns (the backend is published on a macrotask, after R3F has
+  // stored the renderer).
   const makeRenderer = useCallback(
-    async (props: { canvas?: unknown }) => {
-      const { WebGPURenderer } = await import("three/webgpu");
-      const renderer = new WebGPURenderer({
-        canvas: props.canvas as HTMLCanvasElement,
-        antialias: true,
-        powerPreference: "high-performance",
-        forceWebGL: !!forceWebGL,
-      });
-      await renderer.init();
-      useSceneStore
-        .getState()
-        .setBackend("isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl");
-      renderer.toneMapping = ACESFilmicToneMapping;
-      renderer.outputColorSpace = SRGBColorSpace;
-      renderer.setClearColor(new Color(sceneConfig.palette.bgBottom), 1);
-      return renderer;
+    (props: { canvas?: unknown }) => {
+      const canvas = props.canvas as HTMLCanvasElement;
+      const existing = inflight.get(canvas);
+      if (existing) return existing;
+      const promise = (async () => {
+        const { WebGPURenderer } = await import("three/webgpu");
+        // antialias: the scene pass inherits renderer.samples (4), which the fat lines and the
+        // thin rings need for smooth edges
+        const renderer = new WebGPURenderer({
+          canvas,
+          antialias: true,
+          powerPreference: "high-performance",
+          forceWebGL: !!forceWebGL,
+        });
+        await renderer.init();
+        renderer.setClearColor(new Color(sceneConfig.palette.bgBottom), 1);
+        const backend = "isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl";
+        setTimeout(() => useSceneStore.getState().setBackend(backend), 0);
+        return renderer;
+      })();
+      inflight.set(canvas, promise);
+      return promise;
     },
     [forceWebGL],
   );
@@ -104,7 +119,11 @@ export function SceneCanvas({
       data-scene="canvas"
       style={{ position: "relative", overflow: "hidden", background: gradient }}
     >
-      <Canvas dpr={[1, 2]} camera={{ position, fov, near, far }} gl={makeRenderer}>
+      {/* `flat` = NoToneMapping. The plan marks every visible material toneMapped:false and its
+          post composer never tone-maps, so its palette is meant to reach the screen untouched;
+          three/webgpu tone-maps the whole frame once at output (material.toneMapped is inert),
+          which only `flat` switches off. Colours still convert linear → sRGB. */}
+      <Canvas flat dpr={[1, 2]} camera={{ position, fov, near, far }} gl={makeRenderer}>
         <SceneCamera />
         {layers.background ? <Background /> : null}
         {layers.stars ? <Stars /> : null}
