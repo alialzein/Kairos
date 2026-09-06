@@ -19,10 +19,11 @@ import { mulberry32 } from "./sim/random";
 import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
 import { createVeinLines } from "./lines/VeinLines";
+import { createRidgeVeins } from "./lines/RidgeVeins";
 import { createHaloRings } from "./lines/HaloRings";
 import { createSparks, createStarfield } from "./lines/Sparks";
 import { plumePoints, starPoints } from "./lines/halo";
-import { chestNode, mergeTrees, spineTree } from "./lines/veins";
+import { chestNode, mergeTrees, ridgeVeins, spineTree } from "./lines/veins";
 import { liftMesh } from "./lines/likenessMesh";
 import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
@@ -99,6 +100,12 @@ function ParticleSystem({
       ),
     [uniforms],
   );
+  // ridge veins (L6): orange lightning along the mountain crests, waves tier gate
+  const rv = useMemo(
+    () =>
+      wavesN > 0 ? createRidgeVeins(ridgeVeins(mulberry32(SEED + 15)), uniforms, PALETTE) : null,
+    [uniforms, wavesN],
+  );
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
@@ -112,6 +119,7 @@ function ParticleSystem({
     if (lb) scene.add(lb.mesh);
     if (cf) scene.add(cf.sprite);
     scene.add(vn.mesh);
+    if (rv) scene.add(rv.mesh);
     let cancelled = false;
     void gl.computeAsync(sim.init).then(() => {
       if (!cancelled) onReady();
@@ -126,7 +134,9 @@ function ParticleSystem({
       if (lb) scene.remove(lb.mesh);
       if (cf) scene.remove(cf.sprite);
       scene.remove(vn.mesh);
+      if (rv) scene.remove(rv.mesh);
       vn.dispose();
+      rv?.dispose();
       sim.dispose();
       wv?.dispose();
       hl?.dispose();
@@ -135,7 +145,7 @@ function ParticleSystem({
       lb?.dispose();
       cf?.dispose();
     };
-  }, [sim, wv, hl, sp, st, lb, cf, vn, scene, gl, onReady]);
+  }, [sim, wv, hl, sp, st, lb, cf, vn, rv, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();

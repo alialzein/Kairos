@@ -1,4 +1,5 @@
 import type { Rng } from "../sim/random";
+import { waveHeight } from "../sim/targets/waves";
 
 /** Energy veins (look v2, L4): deterministic branching polylines. The spine tree runs from the
  *  throat down to a chest node; the node is a six-fold snowflake. Pure; every branch starts on
@@ -205,4 +206,62 @@ export function mergeTrees(trees: VeinTree[]): VeinTree {
     b += t.branchStarts.length;
   }
   return { segments, segT, segGen, branchStarts };
+}
+
+/** Number of lightning veins along the mountain ridges. */
+export const RIDGE_VEINS = 12;
+
+/** Minimum |x| for a ridge vein at depth z: the bust has no occlusion (additive), so the
+ *  column it covers on screen must stay free of veins at every depth. */
+export function ridgeClearance(z: number): number {
+  if (z > -0.9) return 1.35;
+  if (z > -1.4) return 1.15;
+  return 0.9;
+}
+
+/** Mountain ridge veins (L6): polylines that climb onto the crests of the range heightfield and
+ *  then follow them. Each vein: random start in the far field, heading nudged every step toward
+ *  the height gradient (ascent) so it settles on a ridge, y riding the surface. segGen carries
+ *  the vein index (per-vein flash phase); segT the normalised path position. */
+export function ridgeVeins(rng: Rng): VeinTree {
+  const branches: Branch[] = [];
+  const eps = 0.02;
+  for (let v = 0; v < RIDGE_VEINS; v++) {
+    const side = v % 2 === 0 ? -1 : 1;
+    let z = -2.05 + rng() * 1.45;
+    let x = side * (ridgeClearance(z) + 0.1 + rng() * 1.6);
+    let ang = rng() * Math.PI * 2;
+    const steps = 22 + Math.floor(rng() * 10);
+    const step = 0.085;
+    const b: Branch = { pts: [], dist: [], gen: v };
+    let d = 0;
+    for (let i = 0; i <= steps; i++) {
+      b.pts.push(x, waveHeight(x, z) + 0.012, z);
+      b.dist.push(d);
+      if (i === steps) break;
+      // gradient of the heightfield (ascent direction)
+      const gx = (waveHeight(x + eps, z) - waveHeight(x - eps, z)) / (2 * eps);
+      const gz = (waveHeight(x, z + eps) - waveHeight(x, z - eps)) / (2 * eps);
+      const gl = Math.hypot(gx, gz);
+      const hx = Math.cos(ang),
+        hz = Math.sin(ang);
+      // blend the heading toward the ascent so the vein climbs onto and rides the crest
+      const ux = gl > 1e-4 ? gx / gl : hx;
+      const uz = gl > 1e-4 ? gz / gl : hz;
+      let nx = hx * 0.7 + ux * 0.3 + (rng() - 0.5) * 0.25;
+      let nz = hz * 0.7 + uz * 0.3 + (rng() - 0.5) * 0.25;
+      const nl = Math.hypot(nx, nz) || 1;
+      nx /= nl;
+      nz /= nl;
+      ang = Math.atan2(nz, nx);
+      x += nx * step;
+      z += nz * step;
+      d += step;
+      // stay inside the frame and clear of the column the bust covers on screen
+      if (z > -0.5 || z < -2.2 || Math.abs(x) > 3.2) break;
+      if (Math.abs(x) < ridgeClearance(z)) break;
+    }
+    if (b.pts.length / 3 >= 4) branches.push(b);
+  }
+  return pack(branches, []);
 }
