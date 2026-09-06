@@ -69,6 +69,22 @@ describe("computeFrame", () => {
     expect(v?.turbulence).toBe(0.9);
     expect(v?.size).toBe(0.02);
   });
+  it("shade tracks how humanoid the current morph is", () => {
+    const [idle] = run([base]); // ORB target, morph from NEBULA — no humanoid anywhere
+    expect(idle?.shade).toBe(0);
+    const frames = run(
+      Array.from({ length: 240 }, (_, i) => ({
+        ...base,
+        state: "LISTENING" as const,
+        now: i / 60,
+        since: 0,
+      })),
+    );
+    const last = frames[frames.length - 1];
+    expect(last?.shapeB).toBe(SHAPE_ID.HUMANOID);
+    expect(last?.shade).toBeCloseTo(1);
+    expect(frames[0]?.shade ?? 1).toBeLessThan(last?.shade ?? 0);
+  });
   it("core pulse oscillates between the state's min and max", () => {
     const vals = run([0, 0.5, 1, 1.5, 2, 2.5, 3].map((now) => ({ ...base, now })));
     for (const v of vals) {

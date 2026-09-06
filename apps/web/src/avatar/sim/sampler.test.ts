@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import tiny from "./__fixtures__/bust-tiny.json";
-import { boundsOf, Region, regionsFor, sampleSurface } from "./sampler";
+import { boundsOf, Region, regionsFor, sampleSurface, sampleSurfaceWithNormals } from "./sampler";
 import { mulberry32 } from "./random";
 
 const positions = new Float32Array(tiny.positions);
@@ -22,6 +22,25 @@ describe("sampleSurface", () => {
     for (let i = 0; i < p.length; i += 3) if ((p[i] ?? 0) < 0) left++;
     expect(left / 2000).toBeGreaterThan(0.4);
     expect(left / 2000).toBeLessThan(0.6);
+  });
+});
+
+describe("sampleSurfaceWithNormals", () => {
+  it("returns unit normals alongside the same positions sampleSurface gives for the seed", () => {
+    const { positions: p, normals } = sampleSurfaceWithNormals(
+      positions,
+      indices,
+      500,
+      mulberry32(9),
+      0.02,
+    );
+    const plain = sampleSurface(positions, indices, 500, mulberry32(9), 0.02);
+    expect(Array.from(p)).toEqual(Array.from(plain));
+    expect(normals.length).toBe(1500);
+    for (let i = 0; i < normals.length; i += 3) {
+      const len = Math.hypot(normals[i] ?? 0, normals[i + 1] ?? 0, normals[i + 2] ?? 0);
+      expect(len).toBeCloseTo(1, 3);
+    }
   });
 });
 
