@@ -142,10 +142,19 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     const role = roleOf();
     const isMain = role.equal(2);
 
+    // Directional assembly (avatar-polish T5): during WAKING each particle's morph progress is
+    // delayed by its destination x (left first) plus a little per-particle jitter, so the bust
+    // visibly assembles in a sweep across the frame instead of all at once.
+    const mGlobal = smoothstep(0, 1, u.morph);
+    const xNorm = targetB.element(i).x.mul(0.4).add(0.5).clamp(0, 1);
+    const delay = xNorm.mul(0.55).add(seed.mul(0.15));
+    // u.assemble is the LINEAR waking progress (0 outside WAKING) — the eased morph saturates
+    // too fast for per-particle delays to read as a sweep
+    const mSweep = smoothstep(delay, delay.add(0.3), u.assemble);
     const target = mix(
       targetA.element(i).xyz,
       targetB.element(i).xyz,
-      smoothstep(0, 1, u.morph),
+      select(u.assemble.greaterThan(0), mSweep, mGlobal),
     ).toVar();
     // ORB breathing (±3 % over 4 s) — main particles only
     const breath = float(1).add(

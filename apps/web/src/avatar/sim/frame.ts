@@ -44,6 +44,10 @@ export interface UniformValues {
   aberration: number;
   /** 0..1 — how much of the current morph is the HUMANOID bust; drives normal-based face lighting */
   shade: number;
+  /** 0 outside WAKING; during WAKING the linear 0..1 sweep progress — particles assemble
+   *  left-to-right against this instead of the eased morph (easeOutExpo saturates so fast
+   *  that morph-based delays all fire at once) */
+  assemble: number;
 }
 
 export interface FrameMemory {
@@ -146,6 +150,7 @@ export function computeFrame(
     shade:
       (mem.morph.shapeA === SHAPE_ID.HUMANOID ? 1 - mem.morph.eased : 0) +
       (mem.morph.shapeB === SHAPE_ID.HUMANOID ? mem.morph.eased : 0),
+    assemble: input.state === "WAKING" ? Math.min(1, elapsed / p.morphDuration) : 0,
   };
   return { values, memory: mem };
 }

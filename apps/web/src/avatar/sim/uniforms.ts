@@ -30,6 +30,7 @@ export function createSimUniforms() {
     coreEnd: uniform(0),
     spineEnd: uniform(0),
     shade: uniform(0),
+    assemble: uniform(0),
   };
 }
 export type SimUniforms = ReturnType<typeof createSimUniforms>;
@@ -61,4 +62,5 @@ export function writeUniforms(u: SimUniforms, v: UniformValues): void {
   u.pointerStrength.value = v.pointerStrength;
   u.pointerRadius.value = v.pointerRadius;
   u.shade.value = v.shade;
+  u.assemble.value = v.assemble;
 }

@@ -91,6 +91,16 @@ describe("computeFrame", () => {
     const [t] = run([{ ...base, state: "DORMANT", tuning: { size: 0.02 } }]);
     expect(t?.size).toBeCloseTo(0.02 * 0.55);
   });
+  it("WAKING carries linear assembly progress; other states leave it at 0", () => {
+    const frames = run([
+      { ...base, state: "WAKING", now: 0.3, since: 0 },
+      { ...base, state: "WAKING", now: 3, since: 0 },
+      { ...base, state: "LISTENING", now: 4, since: 3.5 },
+    ]);
+    expect(frames[0]?.assemble).toBeCloseTo(0.3 / 1.2);
+    expect(frames[1]?.assemble).toBe(1);
+    expect(frames[2]?.assemble).toBe(0);
+  });
   it("core pulse oscillates between the state's min and max", () => {
     const vals = run([0, 0.5, 1, 1.5, 2, 2.5, 3].map((now) => ({ ...base, now })));
     for (const v of vals) {
