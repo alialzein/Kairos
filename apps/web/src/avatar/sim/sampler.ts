@@ -26,6 +26,17 @@ export function sampleSurface(
   rng: Rng,
   jitter = 0.01,
 ): Float32Array {
+  return sampleSurfaceWithNormals(positions, indices, n, rng, jitter).positions;
+}
+
+/** sampleSurface plus each point's (flat) triangle normal — consumes the rng identically. */
+export function sampleSurfaceWithNormals(
+  positions: Float32Array,
+  indices: Uint32Array,
+  n: number,
+  rng: Rng,
+  jitter = 0.01,
+): { positions: Float32Array; normals: Float32Array } {
   const triCount = indices.length / 3;
   const cum = new Float64Array(triCount);
   const normals = new Float32Array(triCount * 3);
@@ -53,6 +64,7 @@ export function sampleSurface(
     }
   }
   const out = new Float32Array(n * 3);
+  const outNormals = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
     const r = rng() * total;
     let lo = 0,
@@ -89,8 +101,11 @@ export function sampleSurface(
       u * (positions[b + 2] ?? 0) +
       v * (positions[c + 2] ?? 0) +
       (normals[t * 3 + 2] ?? 0) * j;
+    outNormals[i * 3] = normals[t * 3] ?? 0;
+    outNormals[i * 3 + 1] = normals[t * 3 + 1] ?? 0;
+    outNormals[i * 3 + 2] = normals[t * 3 + 2] ?? 0;
   }
-  return out;
+  return { positions: out, normals: outNormals };
 }
 
 export const Region = { HEAD: 0, FACE: 1, NECK: 2, CHEST: 3, SHOULDERS: 4 } as const;

@@ -72,10 +72,30 @@ describe("buildTargets", () => {
     expect(t.waves.length).toBe(600);
     expect(first100(t.humanoid)).toMatchSnapshot();
   });
+  it("carries unit normals for the humanoid main segment, zeros for core/spine", () => {
+    const t = buildTargets({ n: 1000, waves: 200, seed: 42, bust });
+    expect(t.humanoidNormals.length).toBe(3000);
+    for (let i = 0; i < t.spineEnd * 3; i++) expect(t.humanoidNormals[i]).toBe(0);
+    for (let i = t.spineEnd; i < t.n; i++) {
+      const len = Math.hypot(
+        t.humanoidNormals[i * 3] ?? 0,
+        t.humanoidNormals[i * 3 + 1] ?? 0,
+        t.humanoidNormals[i * 3 + 2] ?? 0,
+      );
+      expect(len).toBeCloseTo(1, 3);
+    }
+  });
   it("strided keeps proportions and determinism", () => {
     const t = buildTargets({ n: 1000, waves: 200, seed: 42, bust });
     const s = strided(t, 500);
     expect(s.n).toBe(500);
+    expect(s.humanoidNormals.length).toBe(1500);
+    const len = Math.hypot(
+      s.humanoidNormals[36 * 3] ?? 0,
+      s.humanoidNormals[36 * 3 + 1] ?? 0,
+      s.humanoidNormals[36 * 3 + 2] ?? 0,
+    );
+    expect(len).toBeCloseTo(1, 3);
     expect(s.coreEnd).toBe(25);
     expect(s.spineEnd).toBe(35);
     expect(s.orb.length).toBe(1500);

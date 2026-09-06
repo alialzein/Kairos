@@ -14,6 +14,8 @@ export interface Targets {
   coreEnd: number;
   spineEnd: number;
   humanoid: Float32Array;
+  /** Per-particle bust surface normals for fake lighting — zeros for core/spine particles. */
+  humanoidNormals: Float32Array;
   orb: Float32Array;
   nebula: Float32Array;
   ring: Float32Array;
@@ -47,11 +49,14 @@ export function buildTargets(opts: {
   regions.set(hu.regions, spineEnd);
   const spineT = new Float32Array(n);
   spineT.set(sp.t, coreEnd);
+  const humanoidNormals = new Float32Array(n * 3);
+  humanoidNormals.set(hu.normals, spineEnd * 3);
   return {
     n,
     coreEnd,
     spineEnd,
     humanoid: concat(corePts, sp.positions, hu.positions),
+    humanoidNormals,
     orb: concat(corePts, sp.positions, orb(main, mulberry32(seed + 4))),
     nebula: concat(corePts, sp.positions, nebula(main, mulberry32(seed + 5))),
     ring: concat(corePts, sp.positions, ring(main, mulberry32(seed + 6))),
@@ -103,6 +108,7 @@ export function strided(t: Targets, n2: number): Targets {
     coreEnd,
     spineEnd,
     humanoid: seg(t.humanoid),
+    humanoidNormals: seg(t.humanoidNormals),
     orb: seg(t.orb),
     nebula: seg(t.nebula),
     ring: seg(t.ring),

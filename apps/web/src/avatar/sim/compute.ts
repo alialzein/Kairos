@@ -1,5 +1,7 @@
 import {
   Fn,
+  clamp,
+  dot,
   float,
   hash,
   instanceIndex,
@@ -101,6 +103,13 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     instancedBufferAttribute(
       new InstancedBufferAttribute(packRegionSpine(targets.regions, targets.spineT, n), 2),
     ) as unknown as Node<"vec2">,
+  );
+
+  // Bust surface normals (zeros for core/spine) — static like regionSpine, material-only.
+  const bustNormal = vec3(
+    instancedBufferAttribute(
+      new InstancedBufferAttribute(targets.humanoidNormals, 3),
+    ) as unknown as Node<"vec3">,
   );
 
   const headAnchor = uniform(v3(ANCHORS.head));
@@ -210,10 +219,24 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     regionSpine.y,
   );
   const faceGlow = select(regionSpine.x.equal(1), u.speak.mul(1.2), float(0));
+  // Fake key light: the additive cloud has no shading, so shallow relief (eye sockets, nose,
+  // lips) reads as a flat glow. A Lambert term against the sampled bust normal restores it —
+  // front-upper-left key, dark falloff doubling as ambient occlusion for back-facing particles.
+  // u.shade fades the effect in only while the morph target is the HUMANOID; other shapes'
+  // particles keep uniform brightness. Core also dims with shade: its bloom flooding through
+  // the head is what erased the face.
+  const keyDir = normalize(vec3(-0.5, 0.6, 0.62));
+  const lambert = clamp(dot(bustNormal, keyDir), 0, 1);
+  const lit = mix(float(1), float(0.15).add(lambert.mul(1.2)), u.shade);
+  // The head core ball (first 60 % of core particles, docs/06 §2) sits at eye level inside the
+  // skull; additive blending ignores occlusion, so at full brightness it floods the face. Dim it
+  // hard while humanoid, keep the chest core hot so the amber still reads through the torso.
+  const isHeadCore = float(instanceIndex).lessThan(u.coreEnd.mul(0.6));
+  const coreDim = mix(float(1), select(isHeadCore, float(0.15), float(0.8)), u.shade);
   const color = select(
     role.equal(0),
-    coreColor,
-    select(role.equal(1), spineColor, mainColor.mul(float(1).add(faceGlow))),
+    coreColor.mul(coreDim),
+    select(role.equal(1), spineColor, mainColor.mul(float(1).add(faceGlow)).mul(lit)),
   );
   // Energy conservation across tiers: the cloud is additive, so at high particle counts thousands
   // of overlapping sprites sum past white and erase all colour texture (ultra looked like a white

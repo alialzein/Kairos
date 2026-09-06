@@ -42,6 +42,8 @@ export interface UniformValues {
   pointerStrength: number;
   pointerRadius: number;
   aberration: number;
+  /** 0..1 — how much of the current morph is the HUMANOID bust; drives normal-based face lighting */
+  shade: number;
 }
 
 export interface FrameMemory {
@@ -141,6 +143,9 @@ export function computeFrame(
     pointerRadius: t.pointerRadius ?? DEFAULTS.pointerRadius,
     aberration:
       input.state === "WAKING" ? p.aberration * Math.max(0, 1 - elapsed / p.morphDuration) : 0,
+    shade:
+      (mem.morph.shapeA === SHAPE_ID.HUMANOID ? 1 - mem.morph.eased : 0) +
+      (mem.morph.shapeB === SHAPE_ID.HUMANOID ? mem.morph.eased : 0),
   };
   return { values, memory: mem };
 }
