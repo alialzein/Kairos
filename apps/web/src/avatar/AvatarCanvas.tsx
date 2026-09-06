@@ -5,6 +5,8 @@ import { Color, Vector3, type PerspectiveCamera } from "three";
 import type { WebGPURenderer } from "three/webgpu";
 import { TIERS, type Tier } from "@twin/config";
 import { FrameStats } from "./telemetry/frametime";
+import { bloomParams } from "./post/params";
+import { createPipeline } from "./post/pipeline";
 import { baseTier, parseTierOverride, readSignals, tierFromProbe } from "./tier";
 import { loadBust } from "./sim/bust";
 import { computeFrame, initialMemory, type FrameMemory } from "./sim/frame";
@@ -33,10 +35,12 @@ function ParticleSystem({
   targets,
   tier,
   onReady,
+  onAberration,
 }: {
   targets: Targets;
   tier: Tier;
   onReady: () => void;
+  onAberration: (v: number) => void;
 }) {
   const gl = useThree((s) => s.gl) as unknown as WebGPURenderer;
   const scene = useThree((s) => s.scene);
@@ -84,6 +88,7 @@ function ParticleSystem({
     );
     memory.current = r.memory;
     writeUniforms(uniforms, r.values);
+    onAberration(r.values.aberration);
     sim.setShapes(r.values.shapeA, r.values.shapeB);
     gl.compute(sim.update);
     if (last.current) stats.current.push((now - last.current) * 1000);
@@ -91,6 +96,28 @@ function ParticleSystem({
     if (stats.current.count % 30 === 0)
       s.setFrames({ p50: stats.current.p50, p95: stats.current.p95, count: stats.current.count });
   });
+  return null;
+}
+
+function PostPass({ tier, aberration }: { tier: Tier; aberration: React.RefObject<number> }) {
+  const gl = useThree((s) => s.gl) as unknown as WebGPURenderer;
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  const tuning = useAvatarStore((s) => s.tuning);
+  const pipe = useMemo(
+    // tuning is applied through setBloom below so slider changes don't rebuild the pipeline
+    () => createPipeline(gl, scene, camera, { bloom: bloomParams(TIERS[tier].bloom, {}) }),
+    [gl, scene, camera, tier],
+  );
+  useEffect(() => {
+    const p = bloomParams(TIERS[tier].bloom, tuning);
+    if (p) pipe.setBloom(p);
+  }, [pipe, tier, tuning]);
+  useEffect(() => () => pipe.dispose(), [pipe]);
+  useFrame(() => {
+    pipe.setAberration(aberration.current ?? 0);
+    pipe.render();
+  }, 1); // priority 1: R3F stops auto-rendering; the pipeline draws the frame
   return null;
 }
 
@@ -164,6 +191,12 @@ export function AvatarCanvas({
   const setBackend = useAvatarStore((s) => s.setBackend);
   const setReady = useAvatarStore((s) => s.setReady);
   const probed = useRef(false);
+  // written by ParticleSystem's frame step (through the callback so only the owning component
+  // mutates it), read by PostPass — deliberately not a SimUniform
+  const aberration = useRef(0);
+  const setAberration = useCallback((v: number) => {
+    aberration.current = v;
+  }, []);
 
   // 2. build targets for the tier (once per tier)
   useEffect(() => {
@@ -226,7 +259,13 @@ export function AvatarCanvas({
           return renderer;
         }}
       >
-        <ParticleSystem targets={targets} tier={tier} onReady={handleReady} />
+        <ParticleSystem
+          targets={targets}
+          tier={tier}
+          onReady={handleReady}
+          onAberration={setAberration}
+        />
+        <PostPass tier={tier} aberration={aberration} />
         {interactive ? <PointerTracker onWake={onWake} /> : null}
       </Canvas>
     </div>
