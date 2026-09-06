@@ -136,7 +136,7 @@ export function computeFrame(
     damping: t.damping ?? DEFAULTS.damping,
     noiseScale: t.noiseScale ?? DEFAULTS.noiseScale,
     noiseAmp: t.noiseAmp ?? DEFAULTS.noiseAmp,
-    size: t.size ?? DEFAULTS.size,
+    size: (t.size ?? DEFAULTS.size) * p.sizeScale,
     alpha: DEFAULTS.alpha,
     pointer: [input.pointer.x, input.pointer.y, 0],
     pointerStrength: input.pointer.active ? input.pointer.strength : 0,

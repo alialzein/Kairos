@@ -85,6 +85,12 @@ describe("computeFrame", () => {
     expect(last?.shade).toBeCloseTo(1);
     expect(frames[0]?.shade ?? 1).toBeLessThan(last?.shade ?? 0);
   });
+  it("DORMANT shrinks particles via the state's sizeScale; tuning size still scales", () => {
+    const [d] = run([{ ...base, state: "DORMANT" }]);
+    expect(d?.size).toBeCloseTo(0.012 * 0.55);
+    const [t] = run([{ ...base, state: "DORMANT", tuning: { size: 0.02 } }]);
+    expect(t?.size).toBeCloseTo(0.02 * 0.55);
+  });
   it("core pulse oscillates between the state's min and max", () => {
     const vals = run([0, 0.5, 1, 1.5, 2, 2.5, 3].map((now) => ({ ...base, now })));
     for (const v of vals) {

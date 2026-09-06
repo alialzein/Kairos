@@ -35,6 +35,8 @@ export interface StateParams {
   audioGain: number;
   /** chromatic aberration amount for the post pass (WAKING) */
   aberration: number;
+  /** particle size multiplier for this state (1 = the tuning/default size) */
+  sizeScale: number;
 }
 
 export const AVATAR_STATES: Record<AvatarState, StateParams> = {
@@ -50,6 +52,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 0,
     audioGain: 0,
     aberration: 0,
+    sizeScale: 0.55,
   },
   IDLE: {
     shape: "ORB",
@@ -63,6 +66,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 0,
     audioGain: 0,
     aberration: 0,
+    sizeScale: 1,
   },
   WAKING: {
     shape: "HUMANOID",
@@ -76,6 +80,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 0,
     audioGain: 0,
     aberration: 1,
+    sizeScale: 1,
   },
   LISTENING: {
     shape: "HUMANOID",
@@ -89,6 +94,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 0,
     audioGain: 0.4,
     aberration: 0,
+    sizeScale: 1,
   },
   THINKING: {
     shape: "HUMANOID",
@@ -102,6 +108,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 1,
     audioGain: 0,
     aberration: 0,
+    sizeScale: 1,
   },
   SPEAKING: {
     shape: "HUMANOID",
@@ -115,6 +122,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 0,
     audioGain: 0.5,
     aberration: 0,
+    sizeScale: 1,
   },
   OFFLINE: {
     shape: "NEBULA",
@@ -128,6 +136,7 @@ export const AVATAR_STATES: Record<AvatarState, StateParams> = {
     vortex: 0,
     audioGain: 0,
     aberration: 0,
+    sizeScale: 0.7,
   },
 };
 

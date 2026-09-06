@@ -116,6 +116,9 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   const faceAnchor = uniform(v3(ANCHORS.face));
   const earL = uniform(v3(ANCHORS.earL));
   const earR = uniform(v3(ANCHORS.earR));
+  const eyeL = uniform(v3(ANCHORS.eyeL));
+  const eyeR = uniform(v3(ANCHORS.eyeR));
+  const mouthAnchor = uniform(v3(ANCHORS.mouth));
 
   const roleOf = () => {
     const fi = float(instanceIndex);
@@ -149,6 +152,16 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
       u.breathing.mul(sin(time.mul(Math.PI / 2))).mul(select(isMain, 1, 0)),
     );
     target.mulAssign(breath);
+    // SPEAKING: the jaw talks — the region below the mouth anchor drops down-and-forward with
+    // an open/close oscillation scaled by speech energy. Displacing the TARGET (not a force)
+    // keeps the chin moving as one coherent piece instead of churning particles into fuzz.
+    const dm = target.sub(mouthAnchor);
+    const open = u.speak.mul(sin(time.mul(9)).mul(0.5).add(0.5));
+    const jawDrop = open
+      .mul(0.09)
+      .mul(smoothstep(0.26, 0.06, length(dm)))
+      .mul(smoothstep(0.03, -0.05, dm.y));
+    target.addAssign(vec3(0, jawDrop.negate(), jawDrop.mul(0.3)));
 
     const dt = deltaTime.min(0.033);
     const flow = mx_noise_vec3(
@@ -168,13 +181,16 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
     // SPEAKING: face region pulses outward with mid energy (region lives in the slots' w component)
     const isFace = targetA.element(i).w.equal(1);
     const fromFace = pos.sub(faceAnchor);
+    // gentle face shimmer only — with sustained speech energy a strong outward pulse dissolved
+    // the whole head into fuzz; the jaw below carries the visible talking motion instead
     const pulse = normalize(fromFace)
-      .mul(u.speak.mul(0.8))
-      .mul(select(isFace, 1, 0.1));
-    // LISTENING: particles near the ears pull inward with mic energy
+      .mul(u.speak.mul(0.3))
+      .mul(select(isFace, 1, 0.05));
+    // LISTENING: particles near the ears pull inward with mic energy (tight radius — 0.6
+    // covered the whole head and made the entire face throb with the energy envelope)
     const ear = select(pos.x.lessThan(0), earL, earR);
     const toEar = ear.sub(pos);
-    const earPull = toEar.mul(u.listen.mul(2)).mul(smoothstep(0.6, 0.0, length(toEar)));
+    const earPull = toEar.mul(u.listen.mul(2)).mul(smoothstep(0.35, 0.0, length(toEar)));
 
     const acc = target
       .sub(pos)
@@ -194,7 +210,9 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   const role = roleOf();
   const seed = hash(instanceIndex.add(7));
   const roleSize = select(role.equal(0), float(2.4), select(role.equal(1), float(1.5), float(1)));
-  const sparkle = float(1).add(u.treble.mul(step(0.9, seed)).mul(1.5));
+  // rare, subtle glints — at 10 % share × 2.5 size the additive cloud read as all-over fuzz
+  // whenever live audio carried treble
+  const sparkle = float(1).add(u.treble.mul(step(0.96, seed)).mul(0.7));
   material.scaleNode = u.size
     .mul(roleSize)
     .mul(float(0.7).add(seed.mul(0.6)))
@@ -233,10 +251,21 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   // hard while humanoid, keep the chest core hot so the amber still reads through the torso.
   const isHeadCore = float(instanceIndex).lessThan(u.coreEnd.mul(0.6));
   const coreDim = mix(float(1), select(isHeadCore, float(0.15), float(0.8)), u.shade);
+  // Defined eyes: darken the socket bowl around each measured eye anchor and light a small
+  // cool pupil at its centre — both gated by shade so non-humanoid shapes are untouched.
+  const dEye = length(posAttr.sub(eyeL)).min(length(posAttr.sub(eyeR)));
+  const socket = smoothstep(0.11, 0.05, dEye);
+  const pupil = smoothstep(0.055, 0.02, dEye);
+  const eyeShade = mix(float(1), float(0.25), socket.mul(u.shade));
+  const pupilGlow = vec3(0.55, 0.85, 1).mul(pupil).mul(u.shade).mul(6);
   const color = select(
     role.equal(0),
     coreColor.mul(coreDim),
-    select(role.equal(1), spineColor, mainColor.mul(float(1).add(faceGlow)).mul(lit)),
+    select(
+      role.equal(1),
+      spineColor,
+      mainColor.mul(float(1).add(faceGlow)).mul(lit).mul(eyeShade).add(pupilGlow),
+    ),
   );
   // Energy conservation across tiers: the cloud is additive, so at high particle counts thousands
   // of overlapping sprites sum past white and erase all colour texture (ultra looked like a white
