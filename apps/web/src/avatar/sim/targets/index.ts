@@ -3,6 +3,7 @@ import { mulberry32 } from "../random";
 import { Region } from "../sampler";
 import { core } from "./core";
 import { humanoid, type BustMesh } from "./humanoid";
+import { applyLikeness } from "./likeness";
 import { nebula } from "./nebula";
 import { orb } from "./orb";
 import { ring } from "./ring";
@@ -45,6 +46,7 @@ export function buildTargets(opts: {
   const corePts = core(coreEnd, mulberry32(seed + 1));
   const sp = spine(spineEnd - coreEnd, mulberry32(seed + 2));
   const hu = humanoid(main, mulberry32(seed + 3), bust);
+  applyLikeness(hu.positions, hu.normals, hu.regions, mulberry32(seed + 9));
   const regions = new Uint8Array(n).fill(Region.CHEST);
   regions.set(hu.regions, spineEnd);
   const spineT = new Float32Array(n);
