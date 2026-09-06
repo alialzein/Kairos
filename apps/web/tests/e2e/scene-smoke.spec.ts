@@ -8,6 +8,8 @@ test("scene bench page boots on WebGPU or WebGL and keeps rendering", async ({ p
   await page.waitForTimeout(2000);
   const later = await page.evaluate(() => window.__twinScene);
   expect((later?.frames ?? 0) - (first?.frames ?? 0)).toBeGreaterThan(10);
+  // HUD chrome (Phase 8) is plain DOM beside the canvas
+  await expect(page.locator("[data-scene-hud]")).toHaveText(/status: listening/i);
 });
 
 test("layers can be switched from the query string", async ({ page }) => {

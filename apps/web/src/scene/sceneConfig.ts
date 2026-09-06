@@ -141,10 +141,30 @@ export interface SceneConfig {
     seed: number;
   };
   post: {
-    bloomIntensity: number;
+    /** three BloomNode.strength — NOT pmndrs `intensity`: three sums five mip blurs with a
+     *  fixed weight total of 3.0 and adds linearly, so the plan's intensity 1.3 ≈ 0.43 */
+    bloomStrength: number;
+    /** BloomNode radius (0..1 mip re-weighting; pmndrs' radius is a different quantity) */
+    bloomRadius: number;
+    /** luminance threshold + smoothstep width — port 1:1 from the plan */
     bloomThreshold: number;
     bloomSmoothing: number;
+    /** bright-pass resolution: 1 thresholds per full-res pixel like pmndrs; three's default
+     *  0.5 box-averages the sub-pixel contour lines under the threshold (cheaper) */
+    bloomResolutionScale: number;
+    /** pmndrs Vignette offset / darkness */
+    vignetteOffset: number;
     vignetteDarkness: number;
+  };
+  /** Phase 8 DOM readout */
+  hud: {
+    text: string;
+    top: number;
+    right: number;
+    fontSize: number;
+    letterSpacing: string;
+    opacity: number;
+    dotSize: number;
   };
   /** Phase 1 starfield. Adapted from drei `<Stars radius depth count factor>`: stars are placed
    *  inside the camera's view cone (not a full sphere) so `count` is the number actually on
@@ -211,7 +231,10 @@ export const sceneConfig: SceneConfig = {
     chestSize: [2.0, 1.0, 1.0],
   },
 
-  contours: { frequency: 90, lineWidth: 0.1, fresnelPower: 2.5, scrollSpeed: 0.05 },
+  // plan: frequency 90. At this camera 90 slices/unit are 0.7 px lines that bloom into a solid
+  // cyan haze (docs/screens/phase-8-alt-plan-values.png); 45 matches the reference's ~45 lines
+  // on the head and keeps dark fill between them (Phase 3/8 acceptance).
+  contours: { frequency: 45, lineWidth: 0.1, fresnelPower: 2.5, scrollSpeed: 0.05 },
 
   // plan: [0, 1.5, 0.45] for the sphere head; the mesh's face (eyes y ≈ 1.35, mouth ≈ 1.08)
   // sits lower than a sphere's centre, so the glow is centred on it at y 1.3
@@ -268,7 +291,31 @@ export const sceneConfig: SceneConfig = {
     seed: 11,
   },
 
-  post: { bloomIntensity: 1.3, bloomThreshold: 0.55, bloomSmoothing: 0.3, vignetteDarkness: 0.7 },
+  // plan: bloomIntensity 1.3 (pmndrs ≈ strength 0.43 after ÷ 3.0 mip-weight total) and
+  // threshold 0.55. With three's linear-luminance bloom those numbers haze the whole bust while
+  // gold (0.54), rings (≤ 0.25) and the blue landscape (0.13) never cross the threshold; strength
+  // 0.25 / threshold 0.3 give the plan's "everything bright glows softly, fill and background do
+  // not" (alt at the plan values: docs/screens/phase-8-alt-plan-values.png). radius 0.8 mirrors
+  // pmndrs' coarse-heavy mipmap default.
+  post: {
+    bloomStrength: 0.25,
+    bloomRadius: 0.8,
+    bloomThreshold: 0.3,
+    bloomSmoothing: 0.3,
+    bloomResolutionScale: 1,
+    vignetteOffset: 0.3,
+    vignetteDarkness: 0.7,
+  },
+
+  hud: {
+    text: "STATUS: LISTENING",
+    top: 24,
+    right: 28,
+    fontSize: 11,
+    letterSpacing: "0.18em",
+    opacity: 0.75,
+    dotSize: 6,
+  },
 
   stars: { count: 400, radius: 60, depth: 20, size: 0.08, opacity: 0.3, aspect: 2.2, seed: 2026 },
 };
