@@ -174,6 +174,8 @@ function ParticleSystem({
       s.setAssemble(q);
     }
     sim.setShapes(r.values.shapeA, r.values.shapeB);
+    // line bust deformations (L8): jaw / listen ripple / thinking twist / offline fray on the CPU
+    lb?.update(dt, r.values, now);
     gl.compute(sim.update);
     if (last.current) stats.current.push((now - last.current) * 1000);
     last.current = now;
