@@ -44,6 +44,8 @@ export interface AvatarStore {
   pointer: PointerState;
   frames: FrameSummary;
   tuning: Tuning;
+  /** linear WAKING assembly progress 0..1 (0 outside WAKING) — drives the HUD "ASSEMBLING… NN%" */
+  assemble: number;
   dispatch: (e: AvatarEvent) => void;
   setState: (s: AvatarState) => void;
   setTier: (t: Tier) => void;
@@ -53,6 +55,7 @@ export interface AvatarStore {
   setPointer: (p: Partial<PointerState>) => void;
   setFrames: (f: FrameSummary) => void;
   setTuning: (t: Tuning) => void;
+  setAssemble: (a: number) => void;
   reset: () => void;
 }
 
@@ -68,6 +71,7 @@ const initial = () => ({
   pointer: { x: 0, y: 0, active: false, strength: 1 },
   frames: { p50: 0, p95: 0, count: 0 },
   tuning: {},
+  assemble: 0,
 });
 
 export const useAvatarStore = create<AvatarStore>()((set, get) => ({
@@ -84,5 +88,6 @@ export const useAvatarStore = create<AvatarStore>()((set, get) => ({
   setPointer: (p) => set((st) => ({ pointer: { ...st.pointer, ...p } })),
   setFrames: (frames) => set({ frames }),
   setTuning: (t) => set((st) => ({ tuning: { ...st.tuning, ...t } })),
+  setAssemble: (assemble) => set({ assemble }),
   reset: () => set(initial()),
 }));

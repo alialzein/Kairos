@@ -109,6 +109,7 @@ function ParticleSystem({
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
+  const lastAssemble = useRef(-1);
 
   useEffect(() => {
     scene.add(sim.sprite);
@@ -165,6 +166,13 @@ function ParticleSystem({
     memory.current = r.memory;
     writeUniforms(uniforms, r.values);
     onAberration(r.values.aberration);
+    // HUD "ASSEMBLING… NN%": publish the linear wake progress, quantised so the store only
+    // updates when the displayed percentage would change
+    const q = Math.round(r.values.assemble * 100) / 100;
+    if (q !== lastAssemble.current) {
+      lastAssemble.current = q;
+      s.setAssemble(q);
+    }
     sim.setShapes(r.values.shapeA, r.values.shapeB);
     gl.compute(sim.update);
     if (last.current) stats.current.push((now - last.current) * 1000);
