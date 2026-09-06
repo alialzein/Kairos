@@ -258,13 +258,28 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   const pupil = smoothstep(0.055, 0.02, dEye);
   const eyeShade = mix(float(1), float(0.25), socket.mul(u.shade));
   const pupilGlow = vec3(0.55, 0.85, 1).mul(pupil).mul(u.shade).mul(6);
+  // Streamline ribbons (avatar-polish T2): thin glowing contour bands wrap the bust like
+  // topographic flow-lines, drifting slowly upward with a slight forward tilt so they read
+  // as motion. Pure brightness modulation on main particles, gated by shade — the eye/mouth
+  // region is masked out so the face features keep their own contrast.
+  const bandPhase = posAttr.y.mul(7).add(posAttr.z.mul(1.5)).sub(time.mul(0.35));
+  const bandWave = sin(bandPhase.mul(Math.PI * 2)).mul(0.5).add(0.5);
+  const faceMask = oneMinus(smoothstep(0.3, 0.14, dEye));
+  const ribbon = smoothstep(0.84, 0.97, bandWave)
+    .mul(u.shade)
+    .mul(faceMask);
   const color = select(
     role.equal(0),
     coreColor.mul(coreDim),
     select(
       role.equal(1),
       spineColor,
-      mainColor.mul(float(1).add(faceGlow)).mul(lit).mul(eyeShade).add(pupilGlow),
+      mainColor
+        .mul(float(1).add(faceGlow))
+        .mul(lit)
+        .mul(eyeShade)
+        .mul(float(1).add(ribbon.mul(2.2)))
+        .add(pupilGlow),
     ),
   );
   // Energy conservation across tiers: the cloud is additive, so at high particle counts thousands
