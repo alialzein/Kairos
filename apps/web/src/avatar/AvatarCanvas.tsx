@@ -198,6 +198,27 @@ export function AvatarCanvas({
     aberration.current = v;
   }, []);
 
+  // MUST be referentially stable: R3F re-creates the renderer when the `gl` prop changes, so an
+  // inline factory plus any parent re-render (e.g. a page subscribing to the store's frame stats)
+  // silently swaps renderers mid-flight — the sim's GPU node caches then straddle two devices and
+  // the scene draws nothing while the loop keeps running.
+  const makeRenderer = useCallback(
+    async (props: { canvas?: unknown }) => {
+      const { WebGPURenderer } = await import("three/webgpu");
+      const renderer = new WebGPURenderer({
+        canvas: props.canvas as HTMLCanvasElement,
+        antialias: false,
+        powerPreference: "high-performance",
+        forceWebGL: !!forceWebGL,
+      });
+      await renderer.init();
+      setBackend("isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl");
+      renderer.setClearColor(new Color("#05070d"), 1);
+      return renderer;
+    },
+    [forceWebGL, setBackend],
+  );
+
   // 2. build targets for the tier (once per tier)
   useEffect(() => {
     if (!tier) return;
@@ -245,19 +266,7 @@ export function AvatarCanvas({
         frameloop={frameloop}
         dpr={[1, dprCap]}
         camera={{ position: [0, 0.05, 3.6], fov: 34, near: 0.1, far: 50 }}
-        gl={async (props) => {
-          const { WebGPURenderer } = await import("three/webgpu");
-          const renderer = new WebGPURenderer({
-            canvas: props.canvas as HTMLCanvasElement,
-            antialias: false,
-            powerPreference: "high-performance",
-            forceWebGL: !!forceWebGL,
-          });
-          await renderer.init();
-          setBackend("isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl");
-          renderer.setClearColor(new Color("#05070d"), 1);
-          return renderer;
-        }}
+        gl={makeRenderer}
       >
         <ParticleSystem
           targets={targets}

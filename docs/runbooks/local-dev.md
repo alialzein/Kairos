@@ -123,6 +123,16 @@ On a cloud project, also turn off "Enable email signups" under Authentication �
 owner account exists — `ALLOW_SIGNUP` only gates the app's own `signInWithOtp` call, not the Supabase
 project setting.
 
+## Avatar playground
+
+`pnpm dev` → sign in → http://localhost:3000/dev/avatar. Left panel: backend, tier and frame times (p50/p95),
+state buttons (one per Avatar State), tier override, energy source (`synth` = fake speech, `file` = pick a
+WAV/MP3, `mic` = browser microphone). Right panel (Leva): live simulation and bloom sliders; `reset` returns
+to the state table. Values you like go into `packages/config/src/avatar.ts` (state table) or
+`apps/web/src/avatar/sim/frame.ts` (`DEFAULTS`) — the playground never persists anything.
+
+Public, no sign-in: http://localhost:3000/bench/avatar?tier=mid&state=SPEAKING (used by the Playwright tests).
+
 ## Ports
 
 | service | port |
