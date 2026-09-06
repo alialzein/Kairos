@@ -263,11 +263,11 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   // as motion. Pure brightness modulation on main particles, gated by shade — the eye/mouth
   // region is masked out so the face features keep their own contrast.
   const bandPhase = posAttr.y.mul(7).add(posAttr.z.mul(1.5)).sub(time.mul(0.35));
-  const bandWave = sin(bandPhase.mul(Math.PI * 2)).mul(0.5).add(0.5);
+  const bandWave = sin(bandPhase.mul(Math.PI * 2))
+    .mul(0.5)
+    .add(0.5);
   const faceMask = oneMinus(smoothstep(0.3, 0.14, dEye));
-  const ribbon = smoothstep(0.84, 0.97, bandWave)
-    .mul(u.shade)
-    .mul(faceMask);
+  const ribbon = smoothstep(0.84, 0.97, bandWave).mul(u.shade).mul(faceMask);
   const color = select(
     role.equal(0),
     coreColor.mul(coreDim),

@@ -32,7 +32,10 @@ export function createHalo(
   const shimmer = float(0.5).add(sin(angle.mul(2).add(time.mul(0.7))).mul(0.5));
   const tint = vec3(palette.particle.r, palette.particle.g, palette.particle.b);
   material.colorNode = vec4(
-    tint.mul(u.brightness).mul(u.shade).mul(float(0.4).add(shimmer.mul(1.1))),
+    tint
+      .mul(u.brightness)
+      .mul(u.shade)
+      .mul(float(0.4).add(shimmer.mul(1.1))),
     1,
   );
   // See sim/compute.ts: shapeCircle()'s .d.ts return type lacks the arithmetic proxy, so reify via float().
