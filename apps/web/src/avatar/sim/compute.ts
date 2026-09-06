@@ -302,7 +302,13 @@ export function createSim(targets: Targets, u: SimUniforms, palette: Palette): S
   // so it is missing the arithmetic proxy methods (.mul etc.) that every other TSL scalar carries.
   // Reify it through float() (a real scalar node) to restore them; runtime shape is identical.
   const circleMask = float(shapeCircle() as unknown as Parameters<typeof float>[0]);
-  material.opacityNode = circleMask.mul(u.alpha).mul(select(role.equal(0), float(1), float(0.7)));
+  // Look v2: while the bust is assembled the fat-line layer carries it; main-particle dust dims
+  // to 25 % underneath (a few sparks remain, as in the reference). Core/spine keep their alpha.
+  const dustDim = select(role.equal(2), oneMinus(u.shade.mul(0.75)), float(1));
+  material.opacityNode = circleMask
+    .mul(u.alpha)
+    .mul(select(role.equal(0), float(1), float(0.7)))
+    .mul(dustDim);
   material.transparent = true;
   material.depthWrite = false;
   material.blending = AdditiveBlending;
