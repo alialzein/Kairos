@@ -3,6 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type BufferGeometry, Color, FrontSide, Mesh, MeshBasicNodeMaterial } from "three/webgpu";
 import { loadBust } from "@/avatar/sim/bust";
+import { createContourMaterial } from "./ContourMaterial";
 import { meshBust, primitiveBust } from "./gen/bustGeometry";
 import { sceneConfig } from "./sceneConfig";
 
@@ -42,7 +43,7 @@ export function Bust({ contours }: { contours: boolean }) {
   );
 
   const material = useMemo(() => {
-    void contours; // Phase 3 swaps in the contour material here
+    if (contours) return createContourMaterial(sceneConfig).material;
     const m = new MeshBasicNodeMaterial({ color: new Color(sceneConfig.palette.fill) });
     m.side = FrontSide;
     return m;

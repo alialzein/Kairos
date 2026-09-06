@@ -2,7 +2,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef } from "react";
 import { layersFromQuery, type LayerQuery } from "@/scene/layers";
-import { LAYER_NAMES, type Layers } from "@/scene/sceneConfig";
+import { applyOverrides } from "@/scene/overrides";
+import { LAYER_NAMES, sceneConfig, type Layers } from "@/scene/sceneConfig";
 import { useSceneStore } from "@/scene/store";
 
 const SceneCanvas = dynamic(() => import("@/scene/SceneCanvas").then((m) => m.SceneCanvas), {
@@ -17,6 +18,7 @@ declare global {
       frames: number;
       stats: { p50: number; p95: number; count: number };
       layers: Layers;
+      applied: string[];
     };
   }
 }
@@ -51,9 +53,21 @@ function LayerBar({ layers }: { layers: Layers }) {
 
 /** Public bench page for the scene: `?phase=N`, `?only=a,b`, `?off=a,b`, `?webgl=1`. Publishes
  *  `window.__twinScene` for Playwright and the screenshot scripts. */
-export function BenchScene({ query, webgl }: { query: LayerQuery; webgl: boolean }) {
+export function BenchScene({
+  query,
+  webgl,
+  set,
+}: {
+  query: LayerQuery;
+  webgl: boolean;
+  /** `?set=contours.frequency:40,...` tuning overrides applied to sceneConfig before mount */
+  set?: string;
+}) {
   // stable for the life of the page: the canvas parent must not re-render (ledger, Task 7)
   const layers = useMemo(() => layersFromQuery(query), [query]);
+  // sceneConfig is a module singleton; the bench page is reloaded for every change, so mutating it
+  // once before the canvas mounts is exactly the plan's "apply the named change, re-screenshot"
+  const applied = useMemo(() => applyOverrides(sceneConfig, set), [set]);
   const frames = useRef(0);
 
   useEffect(() => {
@@ -65,6 +79,7 @@ export function BenchScene({ query, webgl }: { query: LayerQuery; webgl: boolean
         frames: frames.current,
         stats: s.stats,
         layers,
+        applied,
       };
     };
     const unsub = useSceneStore.subscribe(publish);
@@ -79,7 +94,7 @@ export function BenchScene({ query, webgl }: { query: LayerQuery; webgl: boolean
       unsub();
       cancelAnimationFrame(raf);
     };
-  }, [layers]);
+  }, [layers, applied]);
 
   return (
     <main data-theme="dark" data-bench="scene" className="fixed inset-0">

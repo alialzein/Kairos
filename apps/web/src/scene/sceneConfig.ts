@@ -175,7 +175,9 @@ export const sceneConfig: SceneConfig = {
 
   contours: { frequency: 90, lineWidth: 0.1, fresnelPower: 2.5, scrollSpeed: 0.05 },
 
-  core: { center: [0, 1.5, 0.45], radius: 0.35, pulseSpeed: 1.5, pulseAmount: 0.15 },
+  // plan: [0, 1.5, 0.45] for the sphere head; the mesh's face (eyes y ≈ 1.35, mouth ≈ 1.08)
+  // sits lower than a sphere's centre, so the glow is centred on it at y 1.3
+  core: { center: [0, 1.3, 0.45], radius: 0.35, pulseSpeed: 1.5, pulseAmount: 0.15 },
 
   neck: { jawY: 1.02, jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22], nodeY: 0.42, lineWidth: 1.5 },
 

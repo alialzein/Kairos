@@ -15,6 +15,7 @@ export default async function BenchScenePage({
     <BenchScene
       query={{ phase: one(sp.phase), off: one(sp.off), only: one(sp.only) }}
       webgl={one(sp.webgl) === "1"}
+      set={one(sp.set)}
     />
   );
 }
