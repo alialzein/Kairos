@@ -85,11 +85,18 @@ export function createLineBust(contours: Contours, u: SimUniforms, palette: Pale
   // white and read as a lamp, not as orange lines
   // where the orange lives the lines get DIMMER, not brighter: dense additive stacking on the
   // face front otherwise sums to white and erases the hue; CoreFill supplies the warm glow
+  // vein zone (L4): the torso contours dim along the spine column so the orange lightning tree
+  // between throat and chest node has contrast, as in the reference
+  const veinZone = smoothstep(0.2, 0.05, mid.x.abs())
+    .mul(smoothstep(0.24, 0.1, mid.y))
+    .mul(smoothstep(-0.46, -0.32, mid.y))
+    .mul(facing);
   material.colorNode = base
     .mul(u.brightness)
     .mul(1.5)
     .mul(wave)
-    .mul(float(1).sub(coreGlow.mul(0.35)));
+    .mul(float(1).sub(coreGlow.mul(0.35)))
+    .mul(float(1).sub(veinZone.mul(0.55)));
   // accessories (glasses loops, segSlice = -1) sit brighter and whiter than the contour mesh so
   // they read through the dense lines and the orange fill
   const accessory = step(float(-0.5), segSlice.negate()); // 1 when segSlice < 0

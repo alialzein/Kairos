@@ -20,6 +20,8 @@ import { halo } from "./sim/targets/halo";
 import { mulberry32 } from "./sim/random";
 import { createCoreFill } from "./lines/CoreFill";
 import { createLineBust } from "./lines/LineBust";
+import { createVeinLines } from "./lines/VeinLines";
+import { chestNode, mergeTrees, spineTree } from "./lines/veins";
 import { appendPolylines, glassesPolylines, liftMesh } from "./lines/likenessMesh";
 import { sliceMesh, type Contours } from "./lines/slice";
 import { useAvatarStore } from "./state/store";
@@ -74,6 +76,16 @@ function ParticleSystem({
     () => (contours ? createCoreFill(uniforms, PALETTE) : null),
     [contours, uniforms],
   );
+  // energy veins (L4): spine tree + chest node, orange dashed pulses
+  const vn = useMemo(
+    () =>
+      createVeinLines(
+        mergeTrees([spineTree(mulberry32(SEED + 11)), chestNode(mulberry32(SEED + 12))]),
+        uniforms,
+        PALETTE,
+      ),
+    [uniforms],
+  );
   const memory = useRef<FrameMemory>(initialMemory(useAvatarStore.getState().state));
   const stats = useRef(new FrameStats());
   const last = useRef(0);
@@ -84,6 +96,7 @@ function ParticleSystem({
     if (hl) scene.add(hl.sprite);
     if (lb) scene.add(lb.mesh);
     if (cf) scene.add(cf.sprite);
+    scene.add(vn.mesh);
     let cancelled = false;
     void gl.computeAsync(sim.init).then(() => {
       if (!cancelled) onReady();
@@ -95,13 +108,15 @@ function ParticleSystem({
       if (hl) scene.remove(hl.sprite);
       if (lb) scene.remove(lb.mesh);
       if (cf) scene.remove(cf.sprite);
+      scene.remove(vn.mesh);
+      vn.dispose();
       sim.dispose();
       wv?.dispose();
       hl?.dispose();
       lb?.dispose();
       cf?.dispose();
     };
-  }, [sim, wv, hl, lb, cf, scene, gl, onReady]);
+  }, [sim, wv, hl, lb, cf, vn, scene, gl, onReady]);
 
   useFrame((_, dt) => {
     const s = useAvatarStore.getState();
