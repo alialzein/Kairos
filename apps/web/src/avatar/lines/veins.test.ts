@@ -5,10 +5,14 @@ import {
   chestNode,
   mergeTrees,
   NODE_R,
+  RIDGE_VEINS,
+  ridgeClearance,
+  ridgeVeins,
   spineTree,
   THROAT,
   type VeinTree,
 } from "./veins";
+import { waveHeight } from "../sim/targets/waves";
 
 /** every recorded branch start coincides (xy) with some segment endpoint of the tree */
 function connected(t: VeinTree): boolean {
@@ -79,5 +83,27 @@ describe("chestNode", () => {
     expect(m.segT.length).toBe(a.segT.length + b.segT.length);
     expect(m.segments.length).toBe(a.segments.length + b.segments.length);
     expect(m.segGen[a.segT.length]).toBe(b.segGen[0]);
+  });
+});
+
+describe("ridgeVeins", () => {
+  it("rides the mountain heightfield in the far field, deterministic", () => {
+    const t = ridgeVeins(mulberry32(8));
+    expect(t.segT.length).toBeGreaterThan(RIDGE_VEINS * 3);
+    const gens = new Set<number>();
+    for (let s = 0; s < t.segT.length; s++) {
+      gens.add(t.segGen[s] ?? -1);
+      for (const off of [0, 3]) {
+        const x = t.segments[s * 6 + off] ?? 0;
+        const y = t.segments[s * 6 + off + 1] ?? 0;
+        const z = t.segments[s * 6 + off + 2] ?? 0;
+        expect(Math.abs(y - waveHeight(x, z))).toBeLessThan(0.03);
+        expect(z).toBeLessThanOrEqual(-0.5);
+        expect(Math.abs(x)).toBeLessThanOrEqual(3.3);
+        expect(Math.abs(x)).toBeGreaterThanOrEqual(ridgeClearance(z) - 1e-6);
+      }
+    }
+    expect(gens.size).toBeGreaterThanOrEqual(RIDGE_VEINS - 2);
+    expect(Array.from(ridgeVeins(mulberry32(8)).segments)).toEqual(Array.from(t.segments));
   });
 });
