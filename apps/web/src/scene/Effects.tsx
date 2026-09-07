@@ -3,7 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { bloom } from "three/addons/tsl/display/BloomNode.js";
 import { float, length, oneMinus, pass, screenUV, smoothstep, vec4 } from "three/tsl";
-import { RenderPipeline, type WebGPURenderer } from "three/webgpu";
+import { HalfFloatType, RenderPipeline, type WebGPURenderer } from "three/webgpu";
 import { sceneConfig } from "./sceneConfig";
 
 /**
@@ -22,6 +22,25 @@ import { sceneConfig } from "./sceneConfig";
  *   pins alpha to 1, otherwise a premultiplied canvas fades the corners to the page colour.
  * The scene pass renders linear (tone mapping is off: `flat` on the Canvas), and bloom reads
  * those values before the sRGB output transform, so `toneMapped` flags are not needed.
+ *
+ * Phase 12.1 (Ali: "EffectComposer frameBufferType HalfFloat, explicit"). Where the HDR range
+ * survives, read from three 0.185.4:
+ * - Scene pass: `new RenderTarget(w, h, { type: HalfFloatType, ...options })`
+ *   (PassNode.js:246), and `setup()` then re-asserts
+ *   `this.renderTarget.texture.type = renderer.getOutputBufferType()` (PassNode.js:768) — so the
+ *   pass option below states the intent, and the renderer's `outputBufferType: HalfFloatType`
+ *   (SceneCanvas.makeRenderer) is the value that actually sticks. Both are set explicitly.
+ * - Bloom: BloomNode allocates its own bright-pass and 5×2 blur targets, all
+ *   `new RenderTarget(1, 1, { depthBuffer: false, type: HalfFloatType })`
+ *   (BloomNode.js:155/163/170) — half-float, not configurable, nothing to change.
+ * - Output: RenderPipeline.render() wraps `outputNode` in `renderOutput(node, renderer.toneMapping,
+ *   renderer.outputColorSpace)` (RenderPipeline.js:207). `flat` keeps toneMapping = NoToneMapping,
+ *   so nothing compresses the highlights — do NOT add tone mapping here. RenderOutputNode clamps
+ *   alpha only (RenderOutputNode.d 'clamp alpha') and `sRGBTransferOETF` has no clamp either, so
+ *   values > 1 stay > 1 through the whole chain and only clip when the frame is written into the
+ *   8-bit-per-channel canvas swapchain — i.e. the display clips per channel, which is what turns an
+ *   over-boosted blue-cyan into green-cyan. Everything before that write (bloom's bright pass
+ *   included) sees the true HDR value.
  */
 export function Effects() {
   const gl = useThree((s) => s.gl) as unknown as WebGPURenderer;
@@ -30,7 +49,9 @@ export function Effects() {
   const built = useMemo(() => {
     const { post } = sceneConfig;
     const pipeline = new RenderPipeline(gl);
-    const scenePass = pass(scene, camera);
+    // explicit half-float scene buffer (Ali's "frameBufferType HalfFloat"); see the header note on
+    // PassNode.setup() re-asserting this from the renderer's outputBufferType
+    const scenePass = pass(scene, camera, { type: HalfFloatType });
     const color = scenePass.getTextureNode("output");
     const bloomNode = bloom(color, post.bloomStrength, post.bloomRadius, post.bloomThreshold);
     bloomNode.smoothWidth.value = post.bloomSmoothing;

@@ -148,8 +148,12 @@ export interface SceneConfig {
     /** rim = edge · fresnel · this (plan shader literal 0.6; Ali round 1: 0.9) */
     rimStrength: number;
     /** lines are multiplied by 1 + this (plan shader literal 0.8, "push lines above the bloom
-     *  threshold"); it pushed #35C8FF past white into green-cyan, so Ali's "line must be exactly
-     *  #35C8FF" sets it to 0 — bloom now comes from the threshold alone */
+     *  threshold"). Round 1: at 0.8 the lines read green-cyan, so Ali's "line must be exactly
+     *  #35C8FF" set it to 0 — the cast was the *display* clipping the boosted #35C8FF's blue
+     *  channel (blue is already at 1.0, so only green could still rise), not the shader.
+     *  Phase 12.1 (Ali): "line brightness multiplier 1.0 → 1.4" → 0.4, with the half-float scene
+     *  buffer (Effects.tsx) so the > 1 values reach bloom's bright pass instead of being clipped
+     *  before it. */
     lineBoost: number;
     scrollSpeed: number;
     /** Phase 10.3 (Ali): beaded contour lines — each line is modulated along world x by
@@ -354,7 +358,12 @@ export interface SceneConfig {
     /** three BloomNode.strength — NOT pmndrs `intensity`: three sums five mip blurs with a
      *  fixed weight total of 3.0 and adds linearly, so the plan's intensity 1.3 ≈ 0.43 */
     bloomStrength: number;
-    /** BloomNode radius (0..1 mip re-weighting; pmndrs' radius is a different quantity) */
+    /** BloomNode radius: a 0..1 mix factor over the five mip weights, not a pixel radius (pmndrs'
+     *  radius is a different quantity). BloomNode.js:426 is
+     *  `lerpBloomFactor(factor, radius) = mix(factor, 1.2 - factor, radius)` over
+     *  factors [1, 0.8, 0.6, 0.4, 0.2], so radius only shifts weight from the fine mips to the
+     *  coarse ones; the weights sum to 3.0 at *every* radius, which is why `bloomStrength`'s
+     *  ÷ 3.0 mapping is independent of it. */
     bloomRadius: number;
     /** luminance threshold + smoothstep width — port 1:1 from the plan */
     bloomThreshold: number;
@@ -438,9 +447,12 @@ export const sceneConfig: SceneConfig = {
   palette: {
     bgTop: "#020B1F",
     bgBottom: "#082041",
-    fill: "#020C22", // Phase 11.2 (Ali): was #041634 — the bust read as a solid teal block
+    // Phase 11.2 (Ali): fill was #041634 — the bust read as a solid teal block.
+    // Phase 12.1 (Ali): fill #020C22 → #010818 and edge #9BE9FF → #C8F4FF — darker interior, a
+    // colder/brighter rim, so the boosted lines have more contrast to bloom out of.
+    fill: "#010818",
     line: "#35C8FF",
-    edge: "#9BE9FF",
+    edge: "#C8F4FF",
     core: "#FF9A3C",
     gold: "#FFC247",
     landscape: "#2FA8FF",
@@ -502,12 +514,13 @@ export const sceneConfig: SceneConfig = {
   // Ali round 1 Phase 3: lineWidth 0.10 → 0.05, rim 0.6 → 0.9, exact line colour (boost 0)
   // Phase 11.2 (Ali): lineWidth 0.05 → 0.04 with the darker `palette.fill` — the lines must be
   // visibly separated by dark, not merge into one teal block.
+  // Phase 12.1 (Ali): lineBoost 0 → 0.4 (multiplier 1.4) — see the key's comment.
   contours: {
     frequency: 45,
     lineWidth: 0.04,
     fresnelPower: 2.5,
     rimStrength: 0.9,
-    lineBoost: 0,
+    lineBoost: 0.4,
     scrollSpeed: 0.05,
     beads: { enabled: true, frequency: 140, min: 0.35 },
   },
@@ -655,11 +668,20 @@ export const sceneConfig: SceneConfig = {
   // 0.25 / threshold 0.3 give the plan's "everything bright glows softly, fill and background do
   // not" (alt at the plan values: docs/screens/phase-8-alt-plan-values.png). radius 0.8 mirrors
   // pmndrs' coarse-heavy mipmap default.
+  // Phase 12.1 (Ali): "bloomIntensity 1.6 → 2.2, threshold 0.4 → 0.3, bloom radius ×1.3", with the
+  // scene buffer made explicitly half-float (Effects.tsx) so the boosted lines feed bloom unclipped.
   post: {
     // Ali round 1 Phase 8: intensity 1.6 → strength 1.6 / 3.0 = 0.53 (see the key's comment)
-    bloomStrength: 0.533,
-    bloomRadius: 0.8,
-    bloomThreshold: 0.4,
+    // Phase 12.1 (Ali): intensity 2.2 → strength 2.2 / 3.0 = 0.733
+    bloomStrength: 0.733,
+    // Ali asked for radius ×1.3 (0.8 → 1.04); capped at BloomNode's documented maximum of 1.
+    // 1.0 is already the *full mirror* of the mip weights — [1, .8, .6, .4, .2] becomes
+    // [.2, .4, .6, .8, 1], the coarsest possible bias, i.e. the widest glow this control can make.
+    // Above 1 the shader's `mix` is not clamped, so 1.04 would extrapolate 4 % past the mirror
+    // (finest-mip weight 0.2 → 0.168, coarsest 1.0 → 1.032) — outside the documented [0,1] range,
+    // and a change too small to see. Wider glow beyond this needs strength/threshold, not radius.
+    bloomRadius: 1,
+    bloomThreshold: 0.3,
     bloomSmoothing: 0.3,
     bloomResolutionScale: 1,
     vignetteOffset: 0.3,

@@ -112,7 +112,8 @@ export function createContourMaterial(cfg: SceneConfig): ContourMaterial {
   const fill = vec3(mix(vec3(u.fillColor), coreColor.mul(0.35), coreW.mul(0.7)));
   const col = vec3(mix(fill, lineCol, lineBeaded))
     .add(vec3(u.edgeColor).mul(fres).mul(float(u.rimStrength)))
-    .mul(lineBeaded.mul(float(u.lineBoost)).add(1)); // plan: ×1.8 on lines (bloom); 0 = exact hex
+    // plan: ×1.8 on lines (bloom); 0 = exact hex. Phase 12.1 (Ali): ×1.4 (contours.lineBoost 0.4)
+    .mul(lineBeaded.mul(float(u.lineBoost)).add(1));
 
   const material = new MeshBasicNodeMaterial();
   material.colorNode = col;

@@ -165,11 +165,19 @@ export function SceneCanvas({
       if (existing) return existing;
       const promise = (async () => {
         const { WebGPURenderer } = await import("three/webgpu");
+        const { HalfFloatType } = await import("three/webgpu");
         // antialias: the scene pass inherits renderer.samples (4 when on), which the fat lines
-        // and the thin rings need for smooth edges
+        // and the thin rings need for smooth edges.
+        // outputBufferType: Phase 12.1 (Ali) "EffectComposer frameBufferType HalfFloat (explicit)".
+        // three already defaults to HalfFloatType here, but this is the knob that decides it:
+        // PassNode.setup() overwrites its render target's texture type with
+        // renderer.getOutputBufferType() every build, so the pass option in Effects.tsx alone
+        // would not hold. Half-float keeps line/particle values > 1 intact for the bloom bright
+        // pass instead of clipping them in the base image.
         const renderer = new WebGPURenderer({
           canvas,
           antialias: sceneConfig.render.antialias,
+          outputBufferType: HalfFloatType,
           powerPreference: "high-performance",
           forceWebGL: !!forceWebGL,
         });
