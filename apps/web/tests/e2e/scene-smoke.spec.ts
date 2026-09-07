@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+// CI runs the scene on the WebGL2 backend: the runner's SwiftShader WebGPU device is lost
+// ("destroyed", not by us) 40-140 ms after creation, before the first pipelines compile, so
+// nothing ever renders there (bisect on ci/scene-bisect, runs 34098121956 / 34136858023 /
+// 34137480858, 2026-09-07). WebGL2 renders on the runner. Elsewhere the page picks its backend.
+const SCENE_URL = process.env.CI ? "/bench/scene?webgl=1" : "/bench/scene";
+
 test("scene bench page boots on WebGPU or WebGL and keeps rendering", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/bench/scene");
+  await page.goto(SCENE_URL);
   // `ready` is set by the scene's own first frame once the bust mesh is in the scene
   await page.waitForFunction(() => window.__twinScene?.ready === true, null, { timeout: 60_000 });
   const first = await page.evaluate(() => window.__twinScene);

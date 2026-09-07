@@ -71,6 +71,9 @@ interface LostReporter {
 /** one renderer per canvas element, shared by any re-entrant factory call (see makeRenderer) */
 const inflight = new WeakMap<HTMLCanvasElement, Promise<WebGPURenderer>>();
 const pendingDispose = new WeakMap<object, ReturnType<typeof setTimeout>>();
+/** renderers RendererLifecycle disposed: their "destroyed" device loss is expected, any other
+ *  "destroyed" came from the browser (CI's SwiftShader does that ~100 ms after creation) */
+const disposedByUs = new WeakSet<object>();
 
 /**
  * Disposes the WebGPU renderer when the Canvas unmounts: R3F's unmount only knows the WebGL
@@ -92,6 +95,7 @@ function RendererLifecycle() {
         setTimeout(() => {
           pendingDispose.delete(gl);
           inflight.delete(gl.domElement as HTMLCanvasElement);
+          disposedByUs.add(gl);
           (gl as unknown as WebGPURenderer).dispose();
           useSceneStore.getState().reset();
         }, 0),
@@ -145,11 +149,11 @@ export function SceneCanvas({
         renderer.setClearColor(new Color(sceneConfig.palette.bgBottom), 1);
         const backend = "isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl";
         setTimeout(() => useSceneStore.getState().setBackend(backend), 0);
-        // a lost WebGPU device (GPU process crash, driver reset) is otherwise silent: three logs
-        // it but nothing reaches the bench. "destroyed" is our own dispose (RendererLifecycle).
+        // a lost WebGPU device is otherwise silent (three logs the non-"destroyed" ones, and
+        // nothing reaches the bench): report it as the scene's error unless it is our own dispose
         const device = (renderer.backend as { device?: LostReporter }).device;
         device?.lost.then((info) => {
-          if (info.reason === "destroyed") return;
+          if (info.reason === "destroyed" && disposedByUs.has(renderer)) return;
           const message = `webgpu device lost: ${info.reason ?? "unknown"} ${info.message}`;
           console.error(`scene: ${message}`);
           useSceneStore.getState().setError(message);

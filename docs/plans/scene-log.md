@@ -142,6 +142,20 @@ mutation of the config singleton would have leaked one request's overrides into 
 dev double-mount keeps a live renderer); the `@/scene` barrel no longer re-exports the
 client-only canvas; the e2e fails on page errors and, on CI, waits for 30 scene frames.
 
+### CI backend (2026-09-07)
+The page-error assertion turned the CI scene smoke red (147 errors: `Instance dropped in
+popErrorScope` once per pipeline compiling, then a `createBuffer … mappedAtCreation` failure per
+frame). Three throwaway bisect runs on GitHub's runner (34098121956, 34136858023, 34137480858)
+showed the cause is the runner, not the scene: the SwiftShader WebGPU device is lost with reason
+`destroyed` 40–140 ms after creation — no JavaScript `destroy()` call (traced with an init
+script), every layer set including a lone background quad, with or without MSAA, headless shell
+or new headless, with or without the explicit SwiftShader adapter flag, and `/bench/avatar`
+too. No WebGPU frame has ever rendered on CI; WebGL2 renders there (ready in 4.5–7 s, ~10 fps).
+Applied: the smoke runs `?webgl=1` on CI (elsewhere the page picks its backend), MSAA became
+`sceneConfig.render.antialias` (`?set=render.antialias:false`), and a device lost by the browser
+is reported as the scene's `error` (our own dispose stays silent). Not applied, for Ali: the
+avatar's CI e2e and perf baseline measured the same dead device.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
