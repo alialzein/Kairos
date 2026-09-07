@@ -42,12 +42,15 @@ export function createContourUniforms(cfg: SceneConfig) {
     beadOn: uniform(contours.beads.enabled ? 1 : 0),
     coreCenter: uniform(new Vector3(...core.center)),
     coreRadius: uniform(core.radius),
+    // Phase 12.4: the white-hot centre — a fraction of coreRadius, and the colour it mixes to
+    hotRadius: uniform(core.hot.radius),
     pulseSpeed: uniform(core.pulseSpeed),
     pulseAmount: uniform(core.pulseAmount),
     lineColor: uniform(rgb(palette.line)),
     fillColor: uniform(rgb(palette.fill)),
     edgeColor: uniform(rgb(palette.edge)),
     coreColor: uniform(rgb(palette.core)),
+    hotColor: uniform(rgb(palette.coreHot)),
   };
 }
 export type ContourUniforms = ReturnType<typeof createContourUniforms>;
@@ -67,6 +70,11 @@ export interface ContourMaterial {
  * Phase 10.3 (Ali) beads the lines: each one is modulated along world x at
  * `contours.beads.frequency` with a per-slice phase shift, dipping to `contours.beads.min` between
  * dots, so the contours read as strings of dots up close and stay continuous from a distance.
+ *
+ * Phase 12.4 (Ali) makes the core dominate the mid-face: `core.radius` 0.42 → 0.5, and the lines
+ * inside the inner `core.hot.radius` fraction of it mix a second time toward `palette.coreHot`, so
+ * the centre reads white-hot and only the core's edge stays orange. The fill tint is untouched —
+ * it stays `palette.core` — so the whiteness is carried by the lines, not by a wash.
  *
  * float()/vec3() wrappers reify intermediate nodes: @types/three 0.185.4 narrows some TSL
  * overloads (mix(vec3, vec3, float), smoothstep with uniform edges) to `never` — the same gap
@@ -105,10 +113,15 @@ export function createContourMaterial(cfg: SceneConfig): ContourMaterial {
     float(u.pulseAmount).mul(sin(time.mul(u.pulseSpeed))),
   );
   const coreW = coreFall.mul(pulse);
+  // Phase 12.4: a second, tighter falloff inside `hotRadius · coreRadius` of the centre
+  const hotFall = float(
+    oneMinus(smoothstep(float(0), float(u.coreRadius).mul(u.hotRadius), coreDist)),
+  );
+  const hotW = hotFall.mul(pulse);
 
   const lineColor = vec3(u.lineColor);
   const coreColor = vec3(u.coreColor);
-  const lineCol = vec3(mix(lineColor, coreColor, coreW));
+  const lineCol = vec3(mix(vec3(mix(lineColor, coreColor, coreW)), vec3(u.hotColor), hotW));
   const fill = vec3(mix(vec3(u.fillColor), coreColor.mul(0.35), coreW.mul(0.7)));
   const col = vec3(mix(fill, lineCol, lineBeaded))
     .add(vec3(u.edgeColor).mul(fres).mul(float(u.rimStrength)))

@@ -78,6 +78,8 @@ export interface SceneConfig {
     edge: string;
     /** face glow */
     core: string;
+    /** Phase 12.4: the white-hot centre of the face core (see `core.hot`) */
+    coreHot: string;
     /** neck circuitry + landscape highlights */
     gold: string;
     landscape: string;
@@ -176,8 +178,13 @@ export interface SceneConfig {
     pulseAmount: number;
     /** Phase 4 glow billboard: plane size (plan 0.9), z just in front of the face surface
      *  (the mesh's nose tip is at z ≈ 0.61), centre alpha, and the scale-pulse amplitude as a
-     *  fraction of `pulseAmount` (the opacity pulses at the full amount) */
-    glow: { size: number; z: number; alpha: number; scalePulse: number };
+     *  fraction of `pulseAmount` (the opacity pulses at the full amount).
+     *  `brightness` — Phase 12.4: sprite opacity ×1.5 — applied as a colour multiplier because
+     *  opacity is capped at 1 and the half-float buffer carries > 1 into bloom */
+    glow: { size: number; z: number; alpha: number; brightness: number; scalePulse: number };
+    /** Phase 12.4: lines inside the inner `radius` fraction of the core mix toward
+     *  `palette.coreHot` (white-hot centre, orange edge) */
+    hot: { radius: number };
   };
   neck: {
     jawY: number;
@@ -478,6 +485,7 @@ export const sceneConfig: SceneConfig = {
     line: "#35C8FF",
     edge: "#C8F4FF",
     core: "#FF9A3C",
+    coreHot: "#FFE2B0", // Phase 12.4 (Ali): the white-hot centre of the face core
     gold: "#FFC247",
     landscape: "#2FA8FF",
   },
@@ -557,10 +565,13 @@ export const sceneConfig: SceneConfig = {
   // sits lower than a sphere's centre, so the glow is centred on it at y 1.3
   core: {
     center: [0, 1.3, 0.45],
-    radius: 0.42, // round 3 (optional, single value): 0.35 → 0.42
+    // round 3 (optional, single value): 0.35 → 0.42. Phase 12.4 (Ali): 0.42 → 0.5 — the core
+    // dominates the mid-face
+    radius: 0.5,
     pulseSpeed: 1.5,
     pulseAmount: 0.15,
-    glow: { size: 0.9, z: 0.72, alpha: 0.9, scalePulse: 0.5 },
+    glow: { size: 0.9, z: 0.72, alpha: 0.9, brightness: 1.5, scalePulse: 0.5 },
+    hot: { radius: 0.4 },
   },
 
   // plan: jawY 1.02 / controlY 0.75 / nodeY 0.42 for the sphere-head bust. On the mesh the chin

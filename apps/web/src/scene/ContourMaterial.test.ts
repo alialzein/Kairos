@@ -1,3 +1,4 @@
+import { Color, Vector3 } from "three/webgpu";
 import { describe, expect, it } from "vitest";
 import { createContourUniforms } from "./ContourMaterial";
 import { sceneConfig } from "./sceneConfig";
@@ -21,5 +22,18 @@ describe("createContourUniforms — beads", () => {
       },
     });
     expect(u.beadOn.value).toBe(0);
+  });
+});
+
+/** Phase 12.4 — the white-hot centre reaches the shader from config: the inner fraction of the
+ *  core radius, and `palette.coreHot` as a linear-rgb Vector3 (the same conversion as the other
+ *  colour uniforms). */
+describe("createContourUniforms — hot core", () => {
+  it("exposes the hot radius fraction and the hot colour", () => {
+    const u = createContourUniforms(sceneConfig);
+    expect(u.coreRadius.value).toBe(0.5);
+    expect(u.hotRadius.value).toBe(0.4);
+    const hot = new Color(sceneConfig.palette.coreHot);
+    expect(u.hotColor.value).toEqual(new Vector3(hot.r, hot.g, hot.b));
   });
 });
