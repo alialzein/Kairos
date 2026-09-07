@@ -349,14 +349,15 @@ export const sceneConfig: SceneConfig = {
     seed: 5,
   },
 
+  // Ali round 1 Phase 6: 9 rings, outer radius 0.9 + 8·0.25 = 2.9 (≤ 2.9), opacity 0.4 → 0.03
   rings: {
     center: [0, 1.45, -1.3],
     count: 9,
     innerRadius: 0.9,
     step: 0.25,
     thickness: 0.008,
-    opacityFrom: 0.5,
-    opacityTo: 0.06,
+    opacityFrom: 0.4,
+    opacityTo: 0.03,
     segments: 160,
   },
 
