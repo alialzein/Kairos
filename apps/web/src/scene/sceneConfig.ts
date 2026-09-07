@@ -244,20 +244,23 @@ export interface SceneConfig {
     xEnd: number;
     /** number of x intervals per side: cols + 1 points, x reaching xEnd (plan `0..cols`) */
     cols: number;
-    /** exact row count (round 3: 14 rows, z from zStart back by zStep) */
+    /** exact row count (Phase 11.1: 40 rows, z from zStart back by zStep) */
     rows: number;
     zStart: number;
     zStep: number;
-    /** y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·falloff (round 3 heightfield: far
-     *  rows are the peaks, near rows drop below the frame) */
+    /** y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·(0.5 + 0.5·smoothstep(rise, |x|))
+     *  (round 3 heightfield: far rows are the peaks, near rows drop below the frame) */
     baseY: number;
     amplitude: number;
     slope: number;
-    /** bottom fade: vertex opacity × smoothstep(fade[0], fade[1], y) */
+    /** the only fade in the layer: vertex opacity × smoothstep(fade[0], fade[1], y), sitting on
+     *  the bottom edge of the frame so the surface fills each side down to it (Phase 11.1) */
     fade: [number, number];
-    /** smoothstep edges on |x| that keep the ridges off the bust: [start, end] (plan 1.2, 2.2;
-     *  the plan's feedback example "falloff start 1.2 → 1.6" tunes `falloff[0]`) */
-    falloff: [number, number];
+    /** Phase 11.1 (Ali): the ridges keep rising toward the frame edges instead of being cut off
+     *  near the bust — the height is scaled by 0.5 + 0.5·smoothstep(rise[0], rise[1], |x|), so
+     *  half height beside the bust and full (head-height) peaks by |x| = rise[1]. Replaces the
+     *  round-3 |x| falloff smoothstep(1.2, 2.2, |x|), which flattened everything inside 2.2. */
+    rise: [number, number];
     /** two-octave ridge sampled continuously over world (x, z), never per row index:
      *  h = noise2D(x·lowScale, z·lowScale)·lowWeight + noise2D(x·highScale, z·highScale)·highWeight
      *  (round 3: 0.35/0.7 + 0.9/0.25) */
@@ -270,7 +273,8 @@ export interface SceneConfig {
     jitter: number;
     /** inclusive range the per-node neighbour count k is drawn from (Ali: {2, 3}) */
     neighbors: [number, number];
-    /** longest edge in world units (Ali: 0.35) */
+    /** longest edge in world units (Phase 11.1: 0.12 — the denser grid needs shorter edges or
+     *  it reads as a solid mesh) */
     maxEdge: number;
     /** per-node size range, PointsMaterial units (px = size · H/2 / depth); converted to a sprite
      *  size at render time. Nodes are the hero, edges are hints (Ali) */
@@ -283,9 +287,10 @@ export interface SceneConfig {
     /** gold nodes draw at this multiple of their own size (Ali: 1.5×) */
     goldSizeFactor: number;
     goldOpacity: number;
-    /** tiny unconnected points per side, each within `radius` of a height²-weighted node (Ali) */
-    sprinkle: { count: number; size: number; opacity: number; radius: number };
-    /** simplex noise seed for the ridges and rng seed for the jitter, sizes, k, gold and sprinkle */
+    /** Phase 11.1 (Ali): surface dust — tiny unconnected points per side, each within `radius`
+     *  of a node picked uniformly at random (not by height: it is surface dust, not ridge dust) */
+    dust: { count: number; size: number; opacity: number; radius: number };
+    /** simplex noise seed for the ridges and rng seed for the jitter, sizes, k, gold and dust */
     noiseSeed: number;
     seed: number;
   };
@@ -369,8 +374,9 @@ export const sceneConfig: SceneConfig = {
   perf: { dprCapWidth: 1000, dprCap: 1.5, dprMax: 2, mobileWidth: 768, mobileColsFactor: 0.5 },
 
   // Ali's starting sizes (landscape nodes 0.03–0.07) were ~2 px at this depth: edges dominated.
-  // ×3 makes the nodes the hero (docs/screens/phase-10/10-1.png); ratios unchanged.
-  particles: { sizeScale: 3 },
+  // ×3 made the nodes the hero (docs/screens/phase-10/10-1.png); ratios unchanged.
+  // Phase 11.1 (Ali): 3 → 1.5 — "density makes the glow, not point size".
+  particles: { sizeScale: 1.5 },
 
   palette: {
     bgTop: "#020B1F",
@@ -507,34 +513,43 @@ export const sceneConfig: SceneConfig = {
 
   // Ali round 1 Phase 7: amplitude 1.6 → 1.0, ridge lowScale 0.55 → 0.35 (broader peaks),
   // points 0.025 → 0.04 at opacity 0.9
-  // Phase 10.1 (Ali): plexus network — cols 36 → 42 so (cols + 1) × rows = 43 × 14 = 602 nodes
-  // per side ("~600"); jitter 0.06 breaks the grid, k ∈ {2, 3} nearest neighbours with a 0.35
-  // max length replaces the grid-neighbour rule and the dropout; nodes 0.03–0.07 at 0.9 are the
-  // hero, edges 0.25 are hints; gold 12 % of the nodes at 1.5×; 300 sprinkle points per side.
+  // Phase 10.1 (Ali): plexus network — jitter 0.06 breaks the grid, k ∈ {2, 3} nearest
+  // neighbours replace the grid-neighbour rule and the dropout, gold at 1.5× its own size.
+  // Phase 11.1 (Ali): the density pass — "density makes the glow, not point size". The grid goes
+  // 42 × 14 → 160 × 40 (6,440 nodes per side); the z range is unchanged, so zStep drops to
+  // 13·0.35/39 = −0.1167 and the far row still lands at z ≈ −5.05 with the same slope
+  // contribution. Shorter edges (0.35 → 0.12) and fainter ones (0.25 → 0.12) keep the denser
+  // grid from reading as a solid mesh, nodes halve (0.03–0.07 → 0.015–0.035) and gold drops
+  // 12 % → 8 %; amplitude 1.4 → 2.0 under the new `rise` factor pushes the outer ridges up to
+  // head height; the bottom fade tightens to the frame edge and the dust goes 300 → 4,000 per
+  // side within 0.25 of the surface.
   landscape: {
     xStart: 1.2,
     xEnd: 4.0,
-    cols: 42,
-    rows: 14,
+    cols: 160,
+    rows: 40,
     zStart: -0.5,
-    zStep: -0.35,
+    // 13·0.35/39: rows 14 → 40 over the same z range, far row at z ≈ −5.05 as in round 3
+    zStep: -0.1167,
     // round 3: a heightfield sloping down toward the viewer; peaks around neck height
-    baseY: -1.2,
-    amplitude: 1.4,
+    // Phase 11.1: base at the frame's bottom edge (y ≈ −0.86 at the near row) so the slope fills
+    // each side from the bottom up; at −1.2 the near 30 rows sat under the fade window
+    baseY: -0.7,
+    amplitude: 2.0,
     slope: 0.2,
-    fade: [-1.2, -0.4],
-    falloff: [1.2, 2.2],
+    fade: [-0.75, -0.45],
+    rise: [1.2, 4.0],
     ridge: { lowScale: 0.35, lowWeight: 0.7, highScale: 0.9, highWeight: 0.25 },
     jitter: 0.06,
     neighbors: [2, 3],
-    maxEdge: 0.35,
-    nodeSize: [0.03, 0.07],
+    maxEdge: 0.12,
+    nodeSize: [0.015, 0.035],
     nodeOpacity: 0.9,
-    edgeOpacity: 0.25,
-    goldRatio: 0.12,
+    edgeOpacity: 0.12,
+    goldRatio: 0.08,
     goldSizeFactor: 1.5,
     goldOpacity: 0.8,
-    sprinkle: { count: 300, size: 0.015, opacity: 0.5, radius: 0.15 },
+    dust: { count: 4000, size: 0.01, opacity: 0.4, radius: 0.25 },
     noiseSeed: 7,
     seed: 11,
   },

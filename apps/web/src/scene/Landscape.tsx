@@ -21,11 +21,12 @@ import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 /**
  * Phase 7 — wireframe mountain networks on both sides (docs/plans/scene-plan.md Phase 7), rebuilt
  * in Phase 10.1 (Ali) as a plexus network: nodes first, edges second. Five objects — blue node
- * sprites (per-node sizes), gold node sprites at goldSizeFactor×, unconnected sprinkle dust, and
+ * sprites (per-node sizes), gold node sprites at goldSizeFactor×, unconnected surface dust, and
  * the k-nearest-neighbour edges as two 1 px LineSegments (blue hints, and the gold peaks) — all
  * additive with depth writes off. The seeded ridge noise is the repo's simplex (sim/noise.ts,
  * noise2D(x, y) = noise3(x, y, 0)) instead of the simplex-noise package, so no new dependency.
- * Static: no per-frame work.
+ * Static: no per-frame work. Phase 11.1 (Ali) is a density pass on the generator alone — 6,440
+ * nodes and 4,000 dust points per side at half the point size — so the five objects stand.
  */
 export function Landscape() {
   const scene = useThree((s) => s.scene);
@@ -90,16 +91,16 @@ export function Landscape() {
       opacity: l.nodeOpacity,
       opacities: mesh.goldNodeFade,
     });
-    const sprinkle = createPointSprites({
-      points: mesh.sprinkle,
-      size: spriteSizeForPointSize(l.sprinkle.size * particles.sizeScale, currentVerticalFov()),
+    const dust = createPointSprites({
+      points: mesh.dust,
+      size: spriteSizeForPointSize(l.dust.size * particles.sizeScale, currentVerticalFov()),
       color: palette.landscape,
-      opacity: l.sprinkle.opacity,
-      opacities: mesh.sprinkleFade,
+      opacity: l.dust.opacity,
+      opacities: mesh.dustFade,
     });
 
     return {
-      objects: [blue, gold, nodes.sprite, goldNodes.sprite, sprinkle.sprite] as const,
+      objects: [blue, gold, nodes.sprite, goldNodes.sprite, dust.sprite] as const,
       dispose() {
         blue.geometry.dispose();
         blue.material.dispose();
@@ -107,7 +108,7 @@ export function Landscape() {
         gold.material.dispose();
         nodes.dispose();
         goldNodes.dispose();
-        sprinkle.dispose();
+        dust.dispose();
       },
     };
   }, []);

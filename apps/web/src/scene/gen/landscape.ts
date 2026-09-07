@@ -14,9 +14,9 @@ export interface LandscapeMesh {
   goldNodes: Float32Array;
   goldNodeSizes: Float32Array;
   goldNodeFade: Float32Array;
-  /** unconnected dust: `sprinkle.count` per side near the ridge tops, xyz */
-  sprinkle: Float32Array;
-  sprinkleFade: Float32Array;
+  /** unconnected surface dust: `dust.count` per side near the surface, xyz */
+  dust: Float32Array;
+  dustFade: Float32Array;
   /** edges as segment pairs [ax ay az bx by bz, ...], minus the gold ones */
   blue: Float32Array;
   /** per blue segment endpoint: bottom fade, [fa fb, ...] */
@@ -27,7 +27,7 @@ export interface LandscapeMesh {
   /** blue nodes (the remainder); goldNodeCount = round(goldRatio · all nodes) */
   nodeCount: number;
   goldNodeCount: number;
-  sprinkleCount: number;
+  dustCount: number;
   blueCount: number;
   goldCount: number;
 }
@@ -45,19 +45,25 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
  * noise sampled continuously over the node's own jittered world (x, z) — never per row index — so
  * ridges are broad and coherent and every node sits on the surface:
  *   h = noise2D(x·lowScale, z·lowScale)·lowWeight + noise2D(x·highScale, z·highScale)·highWeight
- *   y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·smoothstep(falloff[0], falloff[1], |x|)
- * so the far rows are the peaks and the near rows drop below the frame, and the |x| falloff keeps
- * the terrain off the bust. Every node carries a bottom fade smoothstep(fade[0], fade[1], y) so
- * the surface fades out at the bottom instead of ending on a line.
+ *   y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·(0.5 + 0.5·smoothstep(rise[0], rise[1], |x|))
+ * so the far rows are the peaks, the near rows drop below the frame, and the ridges keep rising
+ * toward the frame edges (Phase 11.1 — replacing round 3's |x| falloff, which flattened the
+ * terrain inside |x| = 2.2). The bottom fade smoothstep(fade[0], fade[1], y) on every node is the
+ * layer's only fade: the surface fills each side down to the bottom edge of the frame and dies
+ * there instead of ending on a line.
  *
  * Phase 10.1 (Ali): nodes are the hero, edges are hints. Each node joins its k nearest neighbours
  * on the same side, k drawn per node from `neighbors` inclusive, skipping candidates farther than
  * `maxEdge` — undirected pairs deduplicated, so long edges cannot exist and the grid-neighbour
  * rule and its dropout are gone. `goldRatio` of the nodes are drawn (without replacement, same
  * rng) with probability ∝ (normalized height)², so gold scatters over every peak; an edge with two
- * gold endpoints is a gold edge. `sprinkle.count` extra unconnected points per side sit within
- * `sprinkle.radius` of a height²-weighted node. rng order: per node jx, jz, size; then k per node;
- * then the gold walk; then the sprinkle. Deterministic for a given noise + rng.
+ * gold endpoints is a gold edge.
+ *
+ * Phase 11.1 (Ali): the density pass — 6,440 nodes per side instead of 602, so the neighbour
+ * search is a uniform grid hash (below) rather than the old O(n²) scan, and `dust.count` points
+ * per side sit within `dust.radius` of a node picked uniformly at random (surface dust, not ridge
+ * dust). rng order, unchanged and load-bearing for determinism: per node jx, jz, size; then k per
+ * node; then the gold walk; then, per dust point, the node pick and its radius/cosθ/φ offset.
  */
 export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rng): LandscapeMesh {
   const cols = l.cols + 1;
@@ -81,8 +87,9 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
         const h =
           noise2D(x * r.lowScale, z * r.lowScale) * r.lowWeight +
           noise2D(x * r.highScale, z * r.highScale) * r.highWeight;
-        const falloff = smoothstep(l.falloff[0], l.falloff[1], Math.abs(x));
-        const y = l.baseY + (l.zStart - z) * l.slope + Math.max(h, 0) * l.amplitude * falloff;
+        // Phase 11.1: half height beside the bust, full height out at the frame edge
+        const rise = 0.5 + 0.5 * smoothstep(l.rise[0], l.rise[1], Math.abs(x));
+        const y = l.baseY + (l.zStart - z) * l.slope + Math.max(h, 0) * l.amplitude * rise;
         const p = side * perSide + i * rows + j;
         pos[p * 3] = x;
         pos[p * 3 + 1] = y;
@@ -93,29 +100,78 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     }
   }
 
-  // k nearest neighbours on the same side, capped at maxEdge. O(n²) per side over ~600 nodes.
+  // k nearest neighbours on the same side, capped at maxEdge. Phase 11.1: 6,440 nodes per side
+  // make the old O(n²) scan 41 M distance tests, so each side's nodes are bucketed into a uniform
+  // 3D grid of cell size `maxEdge` — every candidate within maxEdge then lies in one of the 27
+  // cells around the node's own cell, and the search is linear in the node count. Cell keys are
+  // the same linear function of the cell coordinates for the insert and the probe, so a probe
+  // outside the bounding box can only alias onto another bucket (whose nodes the distance test
+  // rejects) — it can never miss a real neighbour.
   const ks = new Uint8Array(total);
   for (let p = 0; p < total; p++)
     ks[p] = l.neighbors[0] + Math.floor(rng() * (l.neighbors[1] - l.neighbors[0] + 1));
   const maxEdge2 = l.maxEdge * l.maxEdge;
+  const cell = Math.max(l.maxEdge, 1e-6);
   const edges: [number, number][] = [];
   const seen = new Set<number>();
   for (let side = 0; side < 2; side++) {
     const lo = side * perSide;
     const hi = lo + perSide;
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+    for (let p = lo; p < hi; p++) {
+      const x = pos[p * 3] ?? 0;
+      const y = pos[p * 3 + 1] ?? 0;
+      const z = pos[p * 3 + 2] ?? 0;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+    const nY = Math.floor((maxY - minY) / cell) + 1;
+    const nZ = Math.floor((maxZ - minZ) / cell) + 1;
+    const keyOf = (cx: number, cy: number, cz: number) => (cx * nY + cy) * nZ + cz;
+    const buckets = new Map<number, number[]>();
+    for (let p = lo; p < hi; p++) {
+      const k = keyOf(
+        Math.floor(((pos[p * 3] ?? 0) - minX) / cell),
+        Math.floor(((pos[p * 3 + 1] ?? 0) - minY) / cell),
+        Math.floor(((pos[p * 3 + 2] ?? 0) - minZ) / cell),
+      );
+      const bucket = buckets.get(k);
+      if (bucket) bucket.push(p);
+      else buckets.set(k, [p]);
+    }
+    const near: { b: number; d2: number }[] = [];
     for (let a = lo; a < hi; a++) {
       const ax = pos[a * 3] ?? 0;
       const ay = pos[a * 3 + 1] ?? 0;
       const az = pos[a * 3 + 2] ?? 0;
-      const near: { b: number; d2: number }[] = [];
-      for (let b = lo; b < hi; b++) {
-        if (b === a) continue;
-        const dx = (pos[b * 3] ?? 0) - ax;
-        const dy = (pos[b * 3 + 1] ?? 0) - ay;
-        const dz = (pos[b * 3 + 2] ?? 0) - az;
-        const d2 = dx * dx + dy * dy + dz * dz;
-        if (d2 <= maxEdge2) near.push({ b, d2 });
-      }
+      const cx = Math.floor((ax - minX) / cell);
+      const cy = Math.floor((ay - minY) / cell);
+      const cz = Math.floor((az - minZ) / cell);
+      near.length = 0;
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dz = -1; dz <= 1; dz++) {
+            const bucket = buckets.get(keyOf(cx + dx, cy + dy, cz + dz));
+            if (!bucket) continue;
+            for (const b of bucket) {
+              if (b === a) continue;
+              const ex = (pos[b * 3] ?? 0) - ax;
+              const ey = (pos[b * 3 + 1] ?? 0) - ay;
+              const ez = (pos[b * 3 + 2] ?? 0) - az;
+              const d2 = ex * ex + ey * ey + ez * ez;
+              if (d2 <= maxEdge2) near.push({ b, d2 });
+            }
+          }
+      // ties broken by index, so the result never depends on the bucket iteration order
       near.sort((u, v) => u.d2 - v.d2 || u.b - v.b);
       for (const { b } of near.slice(0, ks[a])) {
         const k = Math.min(a, b) * total + Math.max(a, b);
@@ -127,14 +183,22 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
   }
 
   // weighted sampling without replacement: each draw walks the remaining weight mass
-  const heights = Array.from({ length: total }, (_, p) => pos[p * 3 + 1] ?? 0);
-  const minH = Math.min(...heights);
-  const maxH = Math.max(...heights);
+  const heights = new Float64Array(total);
+  let minH = Infinity;
+  let maxH = -Infinity;
+  for (let p = 0; p < total; p++) {
+    const h = pos[p * 3 + 1] ?? 0;
+    heights[p] = h;
+    if (h < minH) minH = h;
+    if (h > maxH) maxH = h;
+  }
   const span = maxH - minH || 1;
-  const weight = heights.map((h) => ((h - minH) / span) ** 2);
+  const weight = new Float64Array(total);
+  for (let p = 0; p < total; p++) weight[p] = (((heights[p] ?? 0) - minH) / span) ** 2;
   const goldNodeCount = Math.round(total * l.goldRatio);
   const isGold = new Uint8Array(total);
-  let remaining = weight.reduce((a, w) => a + w, 0);
+  let remaining = 0;
+  for (let p = 0; p < total; p++) remaining += weight[p] ?? 0;
   for (let r = 0; r < goldNodeCount && remaining > 0; r++) {
     let target = rng() * remaining;
     let pick = -1;
@@ -200,35 +264,25 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     targetFade[at * 2 + 1] = fade[b] ?? 0;
   });
 
-  // sprinkle: per side, a height²-weighted node (with replacement) plus a uniform offset inside a
-  // ball of radius `sprinkle.radius`; it carries that node's fade
-  const sprinkleCount = 2 * l.sprinkle.count;
-  const sprinkle = new Float32Array(sprinkleCount * 3);
-  const sprinkleFade = new Float32Array(sprinkleCount);
+  // dust: per side, a node picked uniformly at random (Phase 11.1 — it is surface dust, so it
+  // follows the surface everywhere, not just the ridge tops) plus a uniform offset inside a ball
+  // of radius `dust.radius`; it carries that node's fade
+  const dustCount = 2 * l.dust.count;
+  const dust = new Float32Array(dustCount * 3);
+  const dustFade = new Float32Array(dustCount);
   let s = 0;
   for (let side = 0; side < 2; side++) {
     const lo = side * perSide;
-    const hi = lo + perSide;
-    let mass = 0;
-    for (let p = lo; p < hi; p++) mass += weight[p] ?? 0;
-    for (let n = 0; n < l.sprinkle.count; n++) {
-      let target = rng() * mass;
-      let pick = hi - 1;
-      for (let p = lo; p < hi; p++) {
-        target -= weight[p] ?? 0;
-        if (target <= 0) {
-          pick = p;
-          break;
-        }
-      }
-      const radius = l.sprinkle.radius * Math.cbrt(rng());
+    for (let n = 0; n < l.dust.count; n++) {
+      const pick = lo + Math.min(perSide - 1, Math.floor(rng() * perSide));
+      const radius = l.dust.radius * Math.cbrt(rng());
       const cosT = 2 * rng() - 1;
       const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
       const phi = 2 * Math.PI * rng();
-      sprinkle[s * 3] = (pos[pick * 3] ?? 0) + radius * sinT * Math.cos(phi);
-      sprinkle[s * 3 + 1] = (pos[pick * 3 + 1] ?? 0) + radius * sinT * Math.sin(phi);
-      sprinkle[s * 3 + 2] = (pos[pick * 3 + 2] ?? 0) + radius * cosT;
-      sprinkleFade[s] = fade[pick] ?? 0;
+      dust[s * 3] = (pos[pick * 3] ?? 0) + radius * sinT * Math.cos(phi);
+      dust[s * 3 + 1] = (pos[pick * 3 + 1] ?? 0) + radius * sinT * Math.sin(phi);
+      dust[s * 3 + 2] = (pos[pick * 3 + 2] ?? 0) + radius * cosT;
+      dustFade[s] = fade[pick] ?? 0;
       s++;
     }
   }
@@ -240,15 +294,15 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     goldNodes,
     goldNodeSizes,
     goldNodeFade,
-    sprinkle,
-    sprinkleFade,
+    dust,
+    dustFade,
     blue,
     blueFade,
     gold,
     goldFade,
     nodeCount,
     goldNodeCount,
-    sprinkleCount,
+    dustCount,
     blueCount,
     goldCount,
   };
