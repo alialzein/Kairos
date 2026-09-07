@@ -159,6 +159,40 @@ worker on CI — SwiftShader is CPU-bound, and with two browsers the smoke fell 
 perf spec's p95 (compared with a baseline) drifted 16 % over it; the smoke now waits for frame
 progress instead of asserting a rate after a fixed sleep.
 
+## Feedback round 1 (Ali, 2026-09-07) — applied exactly, one commit and screenshot per phase
+
+Screenshots: `docs/screens/feedback-1/phase-N.png` and `camera.png`.
+
+- **Phase 2 — eyes.** Asked: hide every GLB node matching /eye|cornea|iris|teeth|tongue/; if
+  baked in, say so first. Finding (reported before anything else): the GLB is one node, one
+  mesh, one primitive (4934 vertices, no materials) — nothing to hide. Ali chose geometry.
+  What the mesh actually has (measured): lids at canonical z ≈ 0.38 with an open slit between
+  y 0.352 and 0.389, and an eyeball surface 0.13 behind it; the white almonds were the slit
+  (edge-on lid ledges saturate the contour anti-aliasing, and the eyeball shows through).
+  Smoothing cannot close a hole — a Taubin pass and a 150-iteration membrane both left the eyes
+  untouched, and even collapsing the whole head kept them. Applied: `flattenCavity` fits a
+  quadric to the outer skin inside the eye box, lays the lids onto it (feathered) and parks the
+  eyeball 0.004 behind it, so the slit is a flush patch with edge-on walls
+  (`bust.glb.cavities`, 2 tests). Ears untouched. A faint closed-lid trace remains at the eye
+  corners; a wider box or more recess did not change it — flag for round 2 if it matters.
+- **Phase 3.** `lineWidth` 0.10 → 0.05; `rimStrength` 0.6 → 0.9 (the shader literal is now a
+  config key). Colour: line/fill/edge were already the exact hexes; the green cast came from
+  the plan shader's ×1.8 line boost pushing #35C8FF past white — now `contours.lineBoost`, set
+  to 0 so the line is exactly #35C8FF (bloom comes from the threshold alone).
+- **Phase 5.** Chin bottom measured on the mesh at world y 0.70 (front profile at |x| < 0.05:
+  nose tip 0.99, lips 0.86, chin 0.80, underside 0.70) → `jawY` 0.67; control point
+  (0.6·x, midpoint y = 0.41); sternum node doubled (points 20, spread 0.06, spokes 0.10,
+  point size 0.04).
+- **Phase 6.** Count was already 9 and the outer radius 0.9 + 8·0.25 = 2.9; `opacityFrom`
+  0.5 → 0.4, `opacityTo` 0.06 → 0.03.
+- **Phase 7.** `amplitude` 1.6 → 1.0, ridge `lowScale` 0.55 → 0.35, `dropout` 0.35 → 0.55,
+  `pointSize` 0.025 → 0.04, `pointOpacity` 0.9. The blue tiles bottom-left were the bench's
+  layer checkbox bar: removed (layers stay switchable by query).
+- **Phase 8.** Confirmed: the pipeline mounts with `layers.post`, tone mapping is off for the
+  whole frame (`flat`) which is what `toneMapped=false` on every material achieves. Intensity
+  1.6 → three strength 0.533 (÷ 3.0 mip weight), threshold 0.4.
+- **Camera.** z 5.5 → 6.0.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
