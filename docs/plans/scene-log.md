@@ -202,6 +202,31 @@ Screenshots: `docs/screens/feedback-1/phase-N.png` and `camera.png`.
   1.6 → three strength 0.533 (÷ 3.0 mip weight), threshold 0.4.
 - **Camera.** z 5.5 → 6.0.
 
+## Feedback round 2 (Ali, 2026-09-07) — applied exactly, one commit and screenshot per item
+
+Screenshots: `docs/screens/feedback-2/`.
+
+1. **Framing.** Fixed horizontal FOV: `camera.hfov` 54 replaces `fov` 32; the vertical fov is
+   re-derived on every resize, fov = 2·atan(tan(27°)/aspect) (32.0° at 16:9, so round-1
+   framing at z 6.0 is unchanged). The sprite-size conversions and the star cone read the
+   derived fov at build. `item-1-16x9.png` and `item-1-half.png`: the landscape is visible in
+   both. Side effect to know: at half width the taller vertical fov shows the bust's bottom
+   edge (skirtTo −1.6); one config value if it should stay below the frame.
+2. **Phase 7.** `baseY` −0.6 → −0.2, `amplitude` 1.0 → 1.4. Gold: the plan's "top 10 % by y" is
+   replaced — 10 % of the kept edges are drawn without replacement with probability
+   ∝ (normalized height)², from the same seeded rng (deterministic); gold now scatters across
+   the peaks on both sides. `item-2.png`.
+3. **Phase 5.** `controlXFactor` 0.6 → 1.3 (bow outward along the neck), `controlY` stays at the
+   midpoint, `jawXs` × 0.75. `item-3.png`.
+4. Eyes (closed-lid trace) and rings: left as they are, per Ali.
+
+Decisions recorded from this round: the scene stays on the bench until round 2 is approved and
+#29 merges; wiring the seven avatar states is its own PR afterwards; the scene replaces look v2
+(no v2 approval pass; `/dev/avatar` goes when the states PR lands); the phone gate is Ali's
+later, not blocking; the CI WebGL2 re-baseline is a separate PR after #29; B5 close-out and
+Track A wait. Process: Phase 9 shipped ahead of Phase 8's approval — kept, but every next phase
+now waits for approval.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
