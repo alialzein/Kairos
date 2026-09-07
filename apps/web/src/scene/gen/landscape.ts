@@ -6,28 +6,42 @@ export type Noise2D = (x: number, y: number) => number;
 export interface LandscapeMesh {
   /** blue nodes, xyz — every node that did not turn gold */
   nodes: Float32Array;
-  /** per blue node: PointsMaterial size (uniform in `nodeSize`) */
+  /** per blue node: PointsMaterial size (uniform in `nodeSize`, × `crest.sizeFactor` on the crest) */
   nodeSizes: Float32Array;
   /** per blue node: bottom fade 0..1 (smoothstep(fade[0], fade[1], y)) */
   nodeFade: Float32Array;
-  /** the `goldRatio` highest-weighted nodes, same layout, sizes × `goldSizeFactor` */
+  /** per blue node: colour multiplier — `crest.brightness` on the crest, 1 elsewhere */
+  nodeBrightness: Float32Array;
+  /** `crest.goldShare` of the crest nodes, same layout, sizes × `goldSizeFactor` on top */
   goldNodes: Float32Array;
   goldNodeSizes: Float32Array;
   goldNodeFade: Float32Array;
+  /** per gold node: always `crest.brightness` — every gold node is a crest node */
+  goldNodeBrightness: Float32Array;
   /** unconnected surface dust: `dust.count` per side near the surface, xyz */
   dust: Float32Array;
   dustFade: Float32Array;
+  /** ridge dust: `crest.dust.count` gold points per side within `crest.dust.radius` of a crest node */
+  goldDust: Float32Array;
+  goldDustFade: Float32Array;
   /** edges as segment pairs [ax ay az bx by bz, ...], minus the gold ones */
   blue: Float32Array;
   /** per blue segment endpoint: bottom fade, [fa fb, ...] */
   blueFade: Float32Array;
+  /** per blue segment endpoint: colour multiplier — `crest.brightness` when both endpoints are
+   *  crest nodes, 1 otherwise (both endpoints of one segment always carry the same value) */
+  blueBrightness: Float32Array;
   /** edges with two gold endpoints, same layout */
   gold: Float32Array;
   goldFade: Float32Array;
-  /** blue nodes (the remainder); goldNodeCount = round(goldRatio · all nodes) */
+  goldBrightness: Float32Array;
+  /** blue nodes (the remainder); goldNodeCount = round(crest.goldShare · crestCount) */
   nodeCount: number;
   goldNodeCount: number;
+  /** crest nodes over both sides = 2 · (cols + 1) · round(rows · crest.ratio) */
+  crestCount: number;
   dustCount: number;
+  goldDustCount: number;
   blueCount: number;
   goldCount: number;
 }
@@ -55,15 +69,29 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
  * Phase 10.1 (Ali): nodes are the hero, edges are hints. Each node joins its k nearest neighbours
  * on the same side, k drawn per node from `neighbors` inclusive, skipping candidates farther than
  * `maxEdge` — undirected pairs deduplicated, so long edges cannot exist and the grid-neighbour
- * rule and its dropout are gone. `goldRatio` of the nodes are drawn (without replacement, same
- * rng) with probability ∝ (normalized height)², so gold scatters over every peak; an edge with two
- * gold endpoints is a gold edge.
+ * rule and its dropout are gone. An edge with two gold endpoints is a gold edge.
  *
- * Phase 11.1 (Ali): the density pass — 6,440 nodes per side instead of 602, so the neighbour
- * search is a uniform grid hash (below) rather than the old O(n²) scan, and `dust.count` points
- * per side sit within `dust.radius` of a node picked uniformly at random (surface dust, not ridge
- * dust). rng order, unchanged and load-bearing for determinism: per node jx, jz, size; then k per
- * node; then the gold walk; then, per dust point, the node pick and its radius/cosθ/φ offset.
+ * Phase 11.1 (Ali): the density pass — thousands of nodes per side instead of 602, so the
+ * neighbour search is a uniform grid hash (below) rather than the old O(n²) scan, and `dust.count`
+ * points per side sit within `dust.radius` of a node picked uniformly at random (surface dust, not
+ * ridge dust).
+ *
+ * Phase 12.2 (Ali): the ridge lines. Per column — one side, one x index, so the `rows` nodes at
+ * `side·perSide + i·rows + j` — the top `round(rows · crest.ratio)` nodes by y (ties by index) are
+ * *crest* nodes: the skyline of the range. A crest node draws at `crest.sizeFactor`× its own size
+ * and carries a colour multiplier of `crest.brightness`; an edge with two crest endpoints carries
+ * the same multiplier, in whichever object it lands (a crest edge with a non-gold endpoint is a
+ * bright blue line, a gold crest edge a bright gold one). The multiplier is on the COLOUR, never
+ * on opacity — the scene buffer is half-float (Phase 12.1), so > 1 reaches bloom's bright pass
+ * instead of clipping — which is what turns the ridges into flowing lines over a dimmer slope.
+ * Gold is now `crest.goldShare` of the crest nodes drawn uniformly (a partial Fisher–Yates over
+ * the crest list), replacing Phase 11.1's height²-weighted walk over every node; all gold
+ * therefore sits on the skyline, and its size factor stacks on the crest's. Finally
+ * `crest.dust.count` gold points per side sit within `crest.dust.radius` of a crest node.
+ *
+ * rng order, unchanged in shape and load-bearing for determinism: per node jx, jz, size; then k
+ * per node; then the gold draw over the crest list; then, per dust point, the node pick and its
+ * radius/cosθ/φ offset; then the same three draws per gold dust point over the crest list.
  */
 export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rng): LandscapeMesh {
   const cols = l.cols + 1;
@@ -100,13 +128,13 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     }
   }
 
-  // k nearest neighbours on the same side, capped at maxEdge. Phase 11.1: 6,440 nodes per side
-  // make the old O(n²) scan 41 M distance tests, so each side's nodes are bucketed into a uniform
-  // 3D grid of cell size `maxEdge` — every candidate within maxEdge then lies in one of the 27
-  // cells around the node's own cell, and the search is linear in the node count. Cell keys are
-  // the same linear function of the cell coordinates for the insert and the probe, so a probe
-  // outside the bounding box can only alias onto another bucket (whose nodes the distance test
-  // rejects) — it can never miss a real neighbour.
+  // k nearest neighbours on the same side, capped at maxEdge. Phase 11.1: thousands of nodes per
+  // side make the old O(n²) scan tens of millions of distance tests, so each side's nodes are
+  // bucketed into a uniform 3D grid of cell size `maxEdge` — every candidate within maxEdge then
+  // lies in one of the 27 cells around the node's own cell, and the search is linear in the node
+  // count. Cell keys are the same linear function of the cell coordinates for the insert and the
+  // probe, so a probe outside the bounding box can only alias onto another bucket (whose nodes the
+  // distance test rejects) — it can never miss a real neighbour.
   const ks = new Uint8Array(total);
   for (let p = 0; p < total; p++)
     ks[p] = l.neighbors[0] + Math.floor(rng() * (l.neighbors[1] - l.neighbors[0] + 1));
@@ -182,79 +210,80 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     }
   }
 
-  // weighted sampling without replacement: each draw walks the remaining weight mass
-  const heights = new Float64Array(total);
-  let minH = Infinity;
-  let maxH = -Infinity;
-  for (let p = 0; p < total; p++) {
-    const h = pos[p * 3 + 1] ?? 0;
-    heights[p] = h;
-    if (h < minH) minH = h;
-    if (h > maxH) maxH = h;
+  // Phase 12.2: the crest — per column, the `crestPerCol` highest nodes by y, ties by index. A
+  // column's nodes are the contiguous run [side·perSide + i·rows, +rows), so this is one sort of
+  // `rows` indices per column and the result never depends on the noise scale or the jitter.
+  const crestPerCol = Math.min(rows, Math.max(0, Math.round(rows * l.crest.ratio)));
+  const isCrest = new Uint8Array(total);
+  const crestBySide: number[][] = [[], []];
+  const order: number[] = new Array<number>(rows);
+  for (let side = 0; side < 2; side++) {
+    for (let i = 0; i < cols; i++) {
+      const lo = side * perSide + i * rows;
+      for (let j = 0; j < rows; j++) order[j] = lo + j;
+      order.sort((a, b) => (pos[b * 3 + 1] ?? 0) - (pos[a * 3 + 1] ?? 0) || a - b);
+      for (let c = 0; c < crestPerCol; c++) isCrest[order[c] ?? lo] = 1;
+    }
+    for (let p = side * perSide; p < (side + 1) * perSide; p++)
+      if (isCrest[p] === 1) crestBySide[side]?.push(p);
   }
-  const span = maxH - minH || 1;
-  const weight = new Float64Array(total);
-  for (let p = 0; p < total; p++) weight[p] = (((heights[p] ?? 0) - minH) / span) ** 2;
-  const goldNodeCount = Math.round(total * l.goldRatio);
+  const crestAll = [...(crestBySide[0] ?? []), ...(crestBySide[1] ?? [])];
+  const crestCount = crestAll.length;
+
+  // gold = `goldShare` of the crest, drawn uniformly without replacement (partial Fisher–Yates
+  // over the crest list, in index order so the draw is deterministic)
+  const goldNodeCount = Math.min(crestCount, Math.round(crestCount * l.crest.goldShare));
   const isGold = new Uint8Array(total);
-  let remaining = 0;
-  for (let p = 0; p < total; p++) remaining += weight[p] ?? 0;
-  for (let r = 0; r < goldNodeCount && remaining > 0; r++) {
-    let target = rng() * remaining;
-    let pick = -1;
-    for (let p = 0; p < total; p++) {
-      if (isGold[p]) continue;
-      target -= weight[p] ?? 0;
-      if (target <= 0) {
-        pick = p;
-        break;
-      }
-    }
-    if (pick < 0) {
-      for (let p = total - 1; p >= 0; p--) {
-        if (!isGold[p] && (weight[p] ?? 0) > 0) {
-          pick = p;
-          break;
-        }
-      }
-    }
-    if (pick < 0) break;
-    isGold[pick] = 1;
-    remaining -= weight[pick] ?? 0;
+  const bag = crestAll.slice();
+  for (let r = 0; r < goldNodeCount; r++) {
+    const swap = r + Math.floor(rng() * (bag.length - r));
+    const a = bag[r] ?? 0;
+    const b = bag[swap] ?? 0;
+    bag[r] = b;
+    bag[swap] = a;
+    isGold[b] = 1;
   }
 
   const nodeCount = total - goldNodeCount;
   const nodes = new Float32Array(nodeCount * 3);
   const nodeSizes = new Float32Array(nodeCount);
   const nodeFade = new Float32Array(nodeCount);
+  const nodeBrightness = new Float32Array(nodeCount);
   const goldNodes = new Float32Array(goldNodeCount * 3);
   const goldNodeSizes = new Float32Array(goldNodeCount);
   const goldNodeFade = new Float32Array(goldNodeCount);
+  const goldNodeBrightness = new Float32Array(goldNodeCount);
   let bn = 0;
   let gn = 0;
   for (let p = 0; p < total; p++) {
     const gold = isGold[p] === 1;
+    const crest = isCrest[p] === 1;
     const at = gold ? gn++ : bn++;
     const target = gold ? goldNodes : nodes;
     for (let c = 0; c < 3; c++) target[at * 3 + c] = pos[p * 3 + c] ?? 0;
-    (gold ? goldNodeSizes : nodeSizes)[at] = (sizes[p] ?? 0) * (gold ? l.goldSizeFactor : 1);
+    (gold ? goldNodeSizes : nodeSizes)[at] =
+      (sizes[p] ?? 0) * (crest ? l.crest.sizeFactor : 1) * (gold ? l.goldSizeFactor : 1);
     (gold ? goldNodeFade : nodeFade)[at] = fade[p] ?? 0;
+    (gold ? goldNodeBrightness : nodeBrightness)[at] = crest ? l.crest.brightness : 1;
   }
 
-  // an edge is gold only when both of its endpoints are
+  // an edge is gold only when both of its endpoints are, and bright only when both are crest
   const goldEdge = edges.map(([a, b]) => isGold[a] === 1 && isGold[b] === 1);
   const goldCount = goldEdge.filter(Boolean).length;
   const blueCount = edges.length - goldCount;
   const blue = new Float32Array(blueCount * 6);
   const blueFade = new Float32Array(blueCount * 2);
+  const blueBrightness = new Float32Array(blueCount * 2);
   const gold = new Float32Array(goldCount * 6);
   const goldFade = new Float32Array(goldCount * 2);
+  const goldBrightness = new Float32Array(goldCount * 2);
   let be = 0;
   let ge = 0;
   edges.forEach(([a, b], k) => {
     const isG = goldEdge[k] === true;
     const target = isG ? gold : blue;
     const targetFade = isG ? goldFade : blueFade;
+    const targetBright = isG ? goldBrightness : blueBrightness;
     const at = isG ? ge++ : be++;
     for (let c = 0; c < 3; c++) {
       target[at * 6 + c] = pos[a * 3 + c] ?? 0;
@@ -262,6 +291,9 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     }
     targetFade[at * 2] = fade[a] ?? 0;
     targetFade[at * 2 + 1] = fade[b] ?? 0;
+    const bright = isCrest[a] === 1 && isCrest[b] === 1 ? l.crest.brightness : 1;
+    targetBright[at * 2] = bright;
+    targetBright[at * 2 + 1] = bright;
   });
 
   // dust: per side, a node picked uniformly at random (Phase 11.1 — it is surface dust, so it
@@ -287,22 +319,53 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     }
   }
 
+  // Phase 12.2 gold dust: the same draw, but over that side's crest nodes and inside the much
+  // tighter `crest.dust.radius` — a gold haze that hugs the ridge lines instead of the surface
+  const goldDustCount = 2 * l.crest.dust.count;
+  const goldDust = new Float32Array(goldDustCount * 3);
+  const goldDustFade = new Float32Array(goldDustCount);
+  let g = 0;
+  for (let side = 0; side < 2; side++) {
+    const list = crestBySide[side] ?? [];
+    for (let n = 0; n < l.crest.dust.count; n++) {
+      if (list.length === 0) break;
+      const pick = list[Math.min(list.length - 1, Math.floor(rng() * list.length))] ?? 0;
+      const radius = l.crest.dust.radius * Math.cbrt(rng());
+      const cosT = 2 * rng() - 1;
+      const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
+      const phi = 2 * Math.PI * rng();
+      goldDust[g * 3] = (pos[pick * 3] ?? 0) + radius * sinT * Math.cos(phi);
+      goldDust[g * 3 + 1] = (pos[pick * 3 + 1] ?? 0) + radius * sinT * Math.sin(phi);
+      goldDust[g * 3 + 2] = (pos[pick * 3 + 2] ?? 0) + radius * cosT;
+      goldDustFade[g] = fade[pick] ?? 0;
+      g++;
+    }
+  }
+
   return {
     nodes,
     nodeSizes,
     nodeFade,
+    nodeBrightness,
     goldNodes,
     goldNodeSizes,
     goldNodeFade,
+    goldNodeBrightness,
     dust,
     dustFade,
+    goldDust,
+    goldDustFade,
     blue,
     blueFade,
+    blueBrightness,
     gold,
     goldFade,
+    goldBrightness,
     nodeCount,
     goldNodeCount,
+    crestCount,
     dustCount,
+    goldDustCount,
     blueCount,
     goldCount,
   };

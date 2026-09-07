@@ -56,6 +56,10 @@ export interface PointSpritesOptions {
   sizes?: Float32Array;
   /** per-point opacity multiplier (one float per point), e.g. the landscape's bottom fade */
   opacities?: Float32Array;
+  /** Phase 12.2: per-point COLOUR multiplier (one float per point), e.g. the landscape's crest
+   *  emphasis. A value > 1 feeds bloom on the half-float buffer (Phase 12.1) instead of clipping,
+   *  which an opacity > 1 could never do — emphasis belongs here, not in `opacities`. */
+  brightness?: Float32Array;
   depthTest?: boolean;
   blending?: Blending;
   renderOrder?: number;
@@ -95,7 +99,12 @@ export function createPointSprites(o: PointSpritesOptions): PointSprites {
     .mul(o.sizes ? instancedArray(o.sizes, "float").element(instanceIndex) : float(1));
   const tint = o.tint ?? 1;
   const color = tint >= 1 ? colorVec3(o.color) : vec3(mix(vec3(1, 1, 1), colorVec3(o.color), tint));
-  material.colorNode = vec4(color, 1);
+  material.colorNode = vec4(
+    o.brightness
+      ? vec3(color.mul(instancedArray(o.brightness, "float").element(instanceIndex)))
+      : color,
+    1,
+  );
   material.opacityNode = softDisc()
     .mul(o.opacity)
     .mul(jitter(o.opacityJitter))

@@ -304,7 +304,7 @@ export interface SceneConfig {
     xEnd: number;
     /** number of x intervals per side: cols + 1 points, x reaching xEnd (plan `0..cols`) */
     cols: number;
-    /** exact row count (Phase 11.1: 40 rows, z from zStart back by zStep) */
+    /** exact row count (Phase 12.2: 60 rows, z from zStart back by zStep) */
     rows: number;
     zStart: number;
     zStep: number;
@@ -341,16 +341,32 @@ export interface SceneConfig {
     nodeSize: [number, number];
     nodeOpacity: number;
     edgeOpacity: number;
-    /** share of all nodes that turn gold, drawn ∝ (normalized height)² without replacement; an
-     *  edge with two gold endpoints is a gold edge */
-    goldRatio: number;
-    /** gold nodes draw at this multiple of their own size (Ali: 1.5×) */
+    /** Phase 12.2 (Ali): the ridge lines. Per column (one side, one x index) the top `ratio` of
+     *  that column's nodes by y are *crest* nodes — the skyline of the range. They draw at
+     *  `sizeFactor`× their own size and at `brightness`× their colour, and an edge whose two
+     *  endpoints are both crest carries the same colour multiplier, so the ridges read as bright
+     *  flowing lines over a dimmer dense slope. `brightness` is a COLOUR multiplier, never an
+     *  opacity: the scene buffer is half-float (Phase 12.1), so values > 1 survive to bloom's
+     *  bright pass instead of clipping at 1. `goldShare` of the crest nodes turn gold (drawn
+     *  uniformly by the rng — this replaces Phase 11.1's height²-weighted `goldRatio` walk over
+     *  every node, so all gold now sits on the skyline), and `dust.count` gold points per side
+     *  sit within `dust.radius` of a crest node at `dust.size` / `dust.opacity`. */
+    crest: {
+      ratio: number;
+      sizeFactor: number;
+      brightness: number;
+      goldShare: number;
+      dust: { count: number; size: number; opacity: number; radius: number };
+    };
+    /** gold nodes draw at this multiple of their own size (Ali: 1.5×), on top of
+     *  `crest.sizeFactor` — every gold node is a crest node */
     goldSizeFactor: number;
     goldOpacity: number;
     /** Phase 11.1 (Ali): surface dust — tiny unconnected points per side, each within `radius`
      *  of a node picked uniformly at random (not by height: it is surface dust, not ridge dust) */
     dust: { count: number; size: number; opacity: number; radius: number };
-    /** simplex noise seed for the ridges and rng seed for the jitter, sizes, k, gold and dust */
+    /** simplex noise seed for the ridges and rng seed for the jitter, sizes, k, gold and the two
+     *  dust passes */
     noiseSeed: number;
     seed: number;
   };
@@ -631,14 +647,21 @@ export const sceneConfig: SceneConfig = {
   // 12 % → 8 %; amplitude 1.4 → 2.0 under the new `rise` factor pushes the outer ridges up to
   // head height; the bottom fade tightens to the frame edge and the dust goes 300 → 4,000 per
   // side within 0.25 of the surface.
+  // Phase 12.2 (Ali): the ridge lines — "bright flowing ridge lines on a dimmer dense slope".
+  // The grid goes 160 × 40 → 200 × 60 (201 × 60 = 12,060 nodes per side, Ali's 12,000); the z
+  // range is unchanged again, so zStep drops to 13·0.35/59 = −0.0771 and the far row still lands
+  // at z ≈ −5.05. Edges fade 0.12 → 0.10 so the extra density stays a haze, and the new `crest`
+  // block carries the emphasis: the top 15 % of every column at 1.6× size and 2× colour, half of
+  // them gold, plus 1,500 gold dust per side hugging the skyline. `goldRatio` is gone — gold is
+  // a share of the crest now, not a height²-weighted draw over the whole surface.
   landscape: {
     xStart: 1.2,
     xEnd: 4.0,
-    cols: 160,
-    rows: 40,
+    cols: 200,
+    rows: 60,
     zStart: -0.5,
-    // 13·0.35/39: rows 14 → 40 over the same z range, far row at z ≈ −5.05 as in round 3
-    zStep: -0.1167,
+    // 13·0.35/59: rows 40 → 60 over the same z range, far row at z ≈ −5.05 as in round 3
+    zStep: -0.0771,
     // round 3: a heightfield sloping down toward the viewer; peaks around neck height
     // Phase 11.1: base at the frame's bottom edge (y ≈ −0.86 at the near row) so the slope fills
     // each side from the bottom up; at −1.2 the near 30 rows sat under the fade window
@@ -653,8 +676,14 @@ export const sceneConfig: SceneConfig = {
     maxEdge: 0.12,
     nodeSize: [0.015, 0.035],
     nodeOpacity: 0.9,
-    edgeOpacity: 0.12,
-    goldRatio: 0.08,
+    edgeOpacity: 0.1,
+    crest: {
+      ratio: 0.15,
+      sizeFactor: 1.6,
+      brightness: 2,
+      goldShare: 0.5,
+      dust: { count: 1500, size: 0.01, opacity: 0.6, radius: 0.1 },
+    },
     goldSizeFactor: 1.5,
     goldOpacity: 0.8,
     dust: { count: 4000, size: 0.01, opacity: 0.4, radius: 0.25 },
