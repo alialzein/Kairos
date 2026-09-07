@@ -118,11 +118,20 @@ corners darkened, `STATUS: LISTENING` top-right with a slow-pulsing dot (`phase-
 - HUD: DOM, 11 px mono, 0.18 em, `palette.line` at 75 %, 6 px dot with a 2 s pulse (off under
   `prefers-reduced-motion`).
 
-### Phase 9 — motion and performance
-Not started: the plan makes it conditional on Phase 8 approval. Already in place: the contour
-scroll (`scrollSpeed`) and the core pulse. Not done: camera drift, gold shimmer, dpr cap below
-1000 px, halved landscape columns on mobile, reduced-motion for the shader animations (only the
-HUD dot respects it today).
+### Phase 9 — motion and performance (after Ali's Phase 8 approval, 2026-09-07)
+Look for: the camera easing ±0.05 sideways over 12 s with the composition fixed, the gold ridge
+edges shimmering, the rings breathing 3 % with a phase offset between them, a dashed pulse
+travelling down two of the neck strands, the contour lines drifting up, the core breathing
+(`docs/screens/feedback-1/phase-9.png` — a still; run `/bench/scene` for the motion).
+- Everything is a uniform, scale or camera update in `useFrame`; nothing is allocated per frame
+  (the shimmer is TSL `time`, no JS at all).
+- Reduced motion: `motion.reducedMotion` "auto" follows the OS preference; "reduce"/"full"
+  force it (`?set=motion.reducedMotion:reduce` shows the still scene). The HUD dot already
+  honoured the media query in CSS.
+- Performance: dpr ≤ 1.5 below 1000 px wide (≤ 2 above — the plan's `[1, 2]`), landscape
+  columns halved below 768 px (verified: 600 px at dpr 3 → a 900×1350 canvas, p50 5 ms).
+- Config: `sceneConfig.motion` (cameraDrift, goldShimmer, ringBreath, neckPulse) and
+  `sceneConfig.perf`; helpers in `scene/motion.ts` (3 tests).
 
 ### Review follow-up (`da55fc1`)
 A second adversarial review (plan-fidelity, quality, perf and correctness lenses, each finding
