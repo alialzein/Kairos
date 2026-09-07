@@ -362,6 +362,79 @@ software WebGL2, but its CI-only wait for 30 sampled frames timed out — SwiftS
 rendering" progress check; the frame-stats check moved to the light phase-1 page, where it still
 proves the stats window publishes. Verified locally with `CI=1` on a production build.
 
+## Phase 12 (Ali, 2026-09-08) — glow & emphasis pass
+
+Still on PR #30, not merged until Ali approves the 12.7 screenshot. Structure approved; this
+round is brightness, contrast and count. Budget ~300k points on desktop, every count halved on
+mobile; p50 reported after 12.7. One commit + screenshot per item, `docs/screens/phase-12/`.
+
+1. **12.1 Bloom & contrast.** `12-1.png`. HDR buffer explicit: `pass(scene, camera, { type:
+   HalfFloatType })` AND `WebGPURenderer({ outputBufferType: HalfFloatType })` — PassNode
+   defaults to half-float but `setup()` overwrites the pass texture type with the renderer's
+   output buffer type on every build, so the renderer option is the one that sticks; BloomNode's
+   own targets are hard-coded half-float. Bloom strength 0.533 → 0.733 (intensity 2.2 ÷ 3),
+   threshold 0.4 → 0.3, radius 0.8 → 1.0: BloomNode's radius is a 0..1 mix over the mip
+   weights that mirrors completely at 1, so Ali's ×1.3 (1.04) would only extrapolate 4 %
+   outside the documented range — set to the maximum instead. Fill #020C22 → #010818, edge
+   #9BE9FF → #C8F4FF, line multiplier 1.0 → 1.4 (`lineBoost` 0.4). No tone mapping; > 1 values
+   survive to bloom and clip only when written to the 8-bit canvas. Screenshot: lines and
+   particles glow, dark stays dark, the line cores read pale cyan-white (no green cast).
+
+2. **12.2 Landscape ridge lines.** `12-2.png`. Crest nodes = per column the top 15 % by
+   height (`landscape.crest`): size ×1.6, colour ×2, crest–crest edges colour ×2 — colour
+   multipliers, never opacity > 1, so they feed bloom on the half-float buffer (per-point
+   `brightness` on the shared sprite, a `brightness` attribute on the edge lines). Grid 160 × 40
+   → 200 × 60 per side (12,060 nodes ≈ Ali's 12,000; `zStep` −0.0771 keeps the z range), edge
+   alpha 0.12 → 0.10. Gold = 50 % of the crest nodes (replaces the height² 8 % draw; the
+   generation dropped from ~1 s to 112 ms), plus 1,500 gold dust per side within 0.1 of a crest
+   node. Counts: 24,120 nodes (3,618 crest, 1,809 gold), 38,911 edges, 8,000 dust, 3,000 gold
+   dust.
+
+3. **12.3 Silhouette halo.** `12-3.png`. `BustHalo.ts`: the same bust geometry drawn again
+   at scale 1.015 about its bounding-box centre (a scale about the origin would lift the crown
+   and widen the shoulders unevenly), back faces only, additive, no depth writes, #9BE9FF,
+   alpha = pow(1 − |n·v|, 2)·0.9 (abs, because back-face normals point away from the camera).
+   New layer `halo` (phase 12; `?off=halo`). Shell 80k → 120k, `alphaRim` 0.6 → 0.9, base
+   0.03. The outline is now the brightest element with a soft halo.
+
+4. **12.4 Face core.** `12-4.png`. `core.radius` 0.42 → 0.5; the glow sprite's "opacity
+   ×1.5" applied as a colour multiplier (`core.glow.brightness` 1.5 — opacity caps at 1, the
+   half-float buffer carries the rest into bloom); lines inside the inner 40 % of the core
+   (`core.hot.radius`) mix toward `palette.coreHot` #FFE2B0, so the centre reads white-hot and
+   the edge orange; the fill tint stays orange. The shell's warm tint shares `core.radius` and
+   widens with it.
+
+5. **12.5 Rings → particle rings.** `12-5.png`. Beads per ring 250 → 1,500 with
+   noise-driven density: angles are rejection-sampled with probability floor + (1 − floor)·
+   (0.5 + 0.5·noise(cos θ·3, sin θ·3, ring)) — sampled on the unit circle so there is no seam
+   at 2π (`rings.points.density`); bead brightness 0.5–1.2 as a colour multiplier; the annuli
+   at ×0.4 (`geometryOpacity` 0.24), a faint guide line under the beads. 13,500 beads,
+   acceptance ratio 0.56, per-ring max/min bin density 2–3.9×.
+
+6. **12.6 Neck + sternum nucleus.** `12-6.png`. Two extra strands per side (`jawXs` now ten,
+   out to ±0.27) on a 0.3 lift cylinder (`neck.cylinderRadius`: the mesh neck is wider than the
+   primitives' 0.2, so the outer strands still wrap instead of flattening behind the surface);
+   sub-branches grow sub-branches (`branches.depth` 2, `branches.sub`: 1–2 per branch at 40–80
+   %, half the parent length, same lift/beads/end beads; depth 1 reproduces Phase 11.3 exactly);
+   bead brightness ×1.3 as a colour multiplier (0.65–1.3). The sternum node became a nucleus
+   (`neck.nucleus`): 300 points in a 0.08 disc, blue-white `palette.edge` inside 0.05 at ×2.5,
+   gold ring outside at ×1.6 (a `colorMix` option on the shared sprite), plus the ×3 core
+   sprite; the strands still end in it. 23 + 35 branches, 3,414 neck sprites in 7 draws.
+
+7. **12.7 Ambient.** `12-7.png`. Dust 2,500 → 8,000 with size variance ×3 (`sizeJitter`
+   [0.2, 2.2] — the ±0.4 spread becomes ±1.2, clamped so no sprite vanishes); crown plume
+   1,500 → 5,000, base radius 0.35, height 1.6, colour ×1.5 (`plume.brightness`). Mobile:
+   every count is halved below `perf.mobileWidth` through one helper (`sceneCount` /
+   `mobileCount`; `perf.mobileColsFactor` became `mobileCountFactor`) — landscape columns and
+   dust, shell, ring beads, neck beads + nucleus, dust, plume, stars — passed to the generators
+   as config overrides, never by mutating `sceneConfig`.
+
+Budget after 12.7 (`pointBudget()` in `motion.ts`, branch beads excluded as rng-dependent):
+desktop **183,521** sprites (landscape 35,120 · shell 120,000 · rings 13,500 · neck 1,501 ·
+dust 8,000 · plume 5,000 · stars 400), mobile 91,821 — under Ali's ~300k. Frame time on the
+RTX 5070 at 1280 × 720, vsync off: **p50 0.8 ms**, p95 1.3 ms (400 × 800 mobile-width
+window: 0.7 / 1.1 ms). WebGL2 fallback renders the same picture, no page errors.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
