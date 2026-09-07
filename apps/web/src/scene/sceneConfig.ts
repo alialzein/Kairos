@@ -392,9 +392,10 @@ export const sceneConfig: SceneConfig = {
   // not" (alt at the plan values: docs/screens/phase-8-alt-plan-values.png). radius 0.8 mirrors
   // pmndrs' coarse-heavy mipmap default.
   post: {
-    bloomStrength: 0.25,
+    // Ali round 1 Phase 8: intensity 1.6 → strength 1.6 / 3.0 = 0.53 (see the key's comment)
+    bloomStrength: 0.533,
     bloomRadius: 0.8,
-    bloomThreshold: 0.3,
+    bloomThreshold: 0.4,
     bloomSmoothing: 0.3,
     bloomResolutionScale: 1,
     vignetteOffset: 0.3,
