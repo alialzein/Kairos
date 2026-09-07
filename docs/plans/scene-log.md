@@ -246,6 +246,62 @@ Screenshots: `docs/screens/feedback-3/phase-7-16x9.png`, `phase-7-half.png`.
 - Check at 16:9 and half width: no vertical spikes, no flat bottom line, peaks around neck
   height, terrain sloping toward the viewer on both sides.
 
+## Phase 10 (Ali, 2026-09-07) — particle pass
+
+PR #29 was already merged when this arrived, so Phase 10 is its own branch/PR (`b5-31-particles`).
+Same scene, different rendering per layer: the reference is built from glowing particles
+(nodes) with short thin edges. One commit + screenshot per item, `docs/screens/phase-10/`.
+
+Shared: every point layer draws one soft sprite — a radial-gradient disc (`softDisc()` in
+`tsl.ts`: 1 − clamp(length(uv − 0.5)·2, 0, 1), the TSL equivalent of Ali's 64 px canvas
+radial gradient, so no texture upload and it runs on both backends), transparent, depth writes
+off, additive, size-attenuated, never tone mapped, per-point sizes where they vary. Ali's point
+sizes are starting values ("keep the ratios, tune the scale"): `particles.sizeScale` (3)
+multiplies all of them — at 1× the landscape nodes were ~2 px at this depth and the edges
+dominated.
+
+1. **10.1 Landscape → plexus network.** `10-1.png`. Nodes: the round-3 heightfield positions
+   (cols 36 → 42 so 43 × 14 = 602 nodes per side ≈ Ali's ~600) jittered ±0.06 in x/z, the height
+   sampled at the jittered (x, z) so nodes sit on the surface. Edges: the grid rule and the
+   dropout are gone; each node links to its k ∈ {2, 3} nearest neighbours on its side, max
+   length 0.35, undirected pairs deduplicated — long edges cannot exist. Nodes 0.03–0.07
+   (×sizeScale) at opacity 0.9, edges 0.25. Gold: the 12 % highest nodes (probability ∝
+   height², without replacement) at 1.5× size; an edge with two gold endpoints is gold (keeps
+   `goldOpacity` + the Phase 9 shimmer). Sprinkle: 300 tiny points per side (0.015, opacity 0.5)
+   within 0.15 of a height²-weighted node, no edges. Because the row spacing (0.35) equals the
+   max edge length, edges chain along the ridges: beaded ridge lines, as accepted. 8 generator
+   tests.
+
+2. **10.2 Bust particle shell.** `10-2.png`. `MeshSurfaceSampler` over the bust mesh
+   (`gen/shell.ts`, seeded): 25,000 soft sprites with the sampled normals, pushed 0.01–0.04 off
+   the skin, sizes 0.01–0.025 (×sizeScale). Alpha = 0.15 + 0.85·fresnel with the contour
+   shader's own fresnel per particle (sampled normal · view direction, `fresnelPower`), so the
+   cloud is bright where the surface turns away and nearly invisible over the face; colour is
+   the line colour tinted toward the core colour by the contour shader's core falloff (no pulse
+   — a pulsing mist would flicker). Depth-tested against the opaque bust, drawn after it. New
+   layer `shell` (phase 10; `?off=shell`). The contour mesh is unchanged. 5 sampler tests.
+   @types/three 0.185.4 lacks `setRandomGenerator` on the sampler (runtime has it since r150):
+   typed by intersection, commented.
+
+3. **10.3 Beaded contour lines.** `10-3-on.png` / `10-3-off.png`. In the contour shader:
+   bead = 0.5 + 0.5·sin(worldX·140 + floor(coord)·1.7); line ×= mix(0.35, 1,
+   smoothstep(0.2, 0.8, bead)). `contours.beads` {enabled, frequency 140, min 0.35}; the
+   toggle is a float uniform, so `?set=contours.beads.enabled:false` restores the plain line
+   exactly. Strings of dots up close, continuous from a distance; the face still reads.
+
+4. **10.4 Rings + neck.** `10-4.png`. Rings: the annuli at ×0.6 (`rings.geometryOpacity`),
+   250 soft sprites per ring along the circle with ±0.03 radial jitter (size 0.02, opacity
+   fading with the ring; children of each ring mesh so the Phase 9 breathing carries them), and
+   ~400 faint drifting points in a 3.5-unit disc around the head (`rings.drift`: the shared
+   sprite with a per-point sine wander on TSL time — the drei Sparkles equivalent on WebGPU;
+   still under reduced motion; depth-tested so the bust occludes them). Neck: 60 gold beads per
+   strand (0.02–0.03) over the fat line, whose folded-in opacity drops 0.9 → 0.3; the sternum
+   node is a 40-point cluster with one bright core sprite (`neck.node.core`). Generator tests
+   for ring/drift points and strand beads.
+
+Not touched, per Ali: camera, colours, bloom, HUD. Frame time with every layer on stayed at the
+display cap (p50 5.0 ms / p95 ≤ 7.6 ms on the RTX 5070 during the screenshots).
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
