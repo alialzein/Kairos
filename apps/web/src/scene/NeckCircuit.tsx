@@ -7,7 +7,7 @@ import { Line2NodeMaterial } from "three/webgpu";
 import { mulberry32 } from "@/avatar/sim/random";
 import { currentVerticalFov } from "./framing";
 import { neckCircuit } from "./gen/neck";
-import { sceneMotionEnabled } from "./motion";
+import { sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
 
@@ -52,10 +52,12 @@ export function NeckCircuit() {
         neckRadius: neck.cylinderRadius,
         lift: neck.lift,
         points: neck.points,
-        strandPoints: neck.strandPoints.perStrand,
+        // Phase 12.7: half the beads and half the nucleus on mobile (the branch counts are
+        // structural, not density — they stay)
+        strandPoints: sceneCount(neck.strandPoints.perStrand),
         strandBrightness: neck.strandPoints.brightness,
         branches: neck.branches,
-        nucleus: neck.nucleus,
+        nucleus: { ...neck.nucleus, points: sceneCount(neck.nucleus.points) },
       },
       mulberry32(neck.seed),
     );

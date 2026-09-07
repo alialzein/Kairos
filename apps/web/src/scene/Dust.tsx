@@ -18,7 +18,7 @@ import { AdditiveBlending, Sprite, SpriteNodeMaterial } from "three/webgpu";
 import { mulberry32 } from "@/avatar/sim/random";
 import { currentVerticalFov } from "./framing";
 import { boxPoints, plumeSeeds } from "./gen/dust";
-import { sceneMotionEnabled } from "./motion";
+import { sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { colorVec3, createPointSprites, softDisc, spriteSizeForPointSize } from "./tsl";
 
@@ -40,6 +40,10 @@ import { colorVec3, createPointSprites, softDisc, spriteSizeForPointSize } from 
  * Under reduced motion both hold still: the ambient layer drops its `drift`, and the plume
  * freezes at `t = phase` with a static per-particle wobble, so the cone still reads as a spray.
  *
+ * Phase 12.7 (Ali) — the ambient pass of the glow phase: 8,000 dust points over ×3 the size
+ * spread and a 5,000-point plume out of a wider, taller cone at `plume.brightness`× its colour.
+ * Both counts go through `sceneCount`, so a mobile viewport builds half of each.
+ *
  * float()/vec2()/vec3() wrappers reify intermediate nodes for the same reason as BustShell.ts:
  * @types/three 0.185.4 narrows some TSL overloads (mix, smoothstep) to `never`.
  */
@@ -50,7 +54,9 @@ export function Dust() {
     const fov = currentVerticalFov();
     const motion = sceneMotionEnabled();
 
-    const a = dust.ambient;
+    // Phase 12.7: every count halves below `perf.mobileWidth` — the config object is never
+    // mutated, the halved count rides in as an override
+    const a = { ...dust.ambient, count: sceneCount(dust.ambient.count) };
     const ambient = createPointSprites({
       points: boxPoints(a, mulberry32(a.seed)),
       size: spriteSizeForPointSize(a.pointSize * particles.sizeScale, fov),
@@ -62,7 +68,7 @@ export function Dust() {
       ...(motion ? { drift: { amount: a.drift.amount, period: a.drift.period } } : {}),
     });
 
-    const p = dust.plume;
+    const p = { ...dust.plume, count: sceneCount(dust.plume.count) };
     const seeds = plumeSeeds(p, mulberry32(p.seed));
     const lane = vec2(instancedArray(seeds.disc, "vec2").element(instanceIndex));
     const phase = float(instancedArray(seeds.phase, "float").element(instanceIndex));
@@ -81,8 +87,11 @@ export function Dust() {
       float(p.crown[2]).add(lane.y.mul(radius)),
     );
     material.scaleNode = float(spriteSizeForPointSize(p.pointSize * particles.sizeScale, fov));
-    // a hotter spray than the contour cyan: palette.line mixed 30 % toward white
-    material.colorNode = vec4(vec3(mix(colorVec3(palette.line), vec3(1, 1, 1), float(0.3))), 1);
+    // a hotter spray than the contour cyan: palette.line mixed 30 % toward white, times
+    // `brightness` (Phase 12.7) — a colour multiplier, so > 1 reaches bloom on the half-float
+    // buffer instead of clipping the way an opacity above 1 would
+    const spray = vec3(mix(colorVec3(palette.line), vec3(1, 1, 1), float(0.3)));
+    material.colorNode = vec4(vec3(spray.mul(float(p.brightness))), 1);
     material.opacityNode = softDisc()
       .mul(p.opacity)
       .mul(float(smoothstep(float(0), float(0.08), t)))

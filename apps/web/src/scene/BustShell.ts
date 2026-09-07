@@ -14,6 +14,7 @@ import { AdditiveBlending, Sprite, SpriteNodeMaterial, type BufferGeometry } fro
 import { mulberry32 } from "@/avatar/sim/random";
 import { currentVerticalFov } from "./framing";
 import { sampleShell } from "./gen/shell";
+import { sceneCount } from "./motion";
 import type { SceneConfig } from "./sceneConfig";
 import { colorVec3, softDisc, spriteSizeForPointSize } from "./tsl";
 
@@ -40,7 +41,8 @@ export interface BustShell {
  */
 export function createBustShell(geometry: BufferGeometry, cfg: SceneConfig): BustShell {
   const { bust, contours, core, palette, particles } = cfg;
-  const s = bust.shell;
+  // Phase 12.7: half the shell on mobile widths — an override, `sceneConfig` is never mutated
+  const s = { ...bust.shell, count: sceneCount(bust.shell.count) };
   const cloud = sampleShell(geometry, s, mulberry32(s.seed));
 
   const positions = instancedArray(cloud.positions, "vec3");

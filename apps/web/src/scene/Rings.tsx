@@ -6,7 +6,7 @@ import { makeNoise } from "@/avatar/sim/noise";
 import { mulberry32 } from "@/avatar/sim/random";
 import { currentVerticalFov } from "./framing";
 import { ringPoints, ringSpecs } from "./gen/rings";
-import { sceneMotionEnabled } from "./motion";
+import { sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { createPointSprites, spriteSizeForPointSize, type PointSprites } from "./tsl";
 
@@ -62,7 +62,7 @@ export function Rings() {
       const bead = ringPoints(
         spec,
         {
-          perRing: rings.points.perRing,
+          perRing: sceneCount(rings.points.perRing), // Phase 12.7: half the beads on mobile
           radialJitter: rings.points.radialJitter,
           thickness: rings.thickness,
           density: rings.points.density,

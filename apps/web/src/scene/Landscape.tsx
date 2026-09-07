@@ -13,7 +13,7 @@ import { makeNoise } from "@/avatar/sim/noise";
 import { mulberry32 } from "@/avatar/sim/random";
 import { currentVerticalFov } from "./framing";
 import { landscape } from "./gen/landscape";
-import { landscapeCols, sceneMotionEnabled } from "./motion";
+import { landscapeCols, sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { attribute, float, sin, time } from "three/tsl";
 import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
@@ -38,7 +38,17 @@ export function Landscape() {
     // Phase 9 perf: half the columns on mobile widths
     const cols =
       typeof window === "undefined" ? base.cols : landscapeCols(window.innerWidth, base.cols, perf);
-    const l = { ...base, cols };
+    // Phase 12.7: the two dust passes halve on mobile too — overrides of the config object,
+    // never a mutation of `sceneConfig`
+    const l = {
+      ...base,
+      cols,
+      dust: { ...base.dust, count: sceneCount(base.dust.count) },
+      crest: {
+        ...base.crest,
+        dust: { ...base.crest.dust, count: sceneCount(base.crest.dust.count) },
+      },
+    };
     const n3 = makeNoise(l.noiseSeed);
     const mesh = landscape(l, (x, y) => n3(x, y, 0), mulberry32(l.seed));
 

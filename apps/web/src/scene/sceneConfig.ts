@@ -62,7 +62,10 @@ export interface SceneConfig {
     dprCap: number;
     dprMax: number;
     mobileWidth: number;
-    mobileColsFactor: number;
+    /** Phase 12.7 (Ali): halve every count on mobile — landscape columns, bust shell, ring beads,
+     *  neck beads via `motion.ts` `sceneCount`, dust, plume, stars. Was `mobileColsFactor`, which
+     *  only the landscape read; the glow phase's counts make every layer heavy enough to need it. */
+    mobileCountFactor: number;
   };
   /** Phase 10 (Ali): every point layer shares one soft sprite; the spec's point sizes are
    *  starting values ("keep the ratios, tune the scale") — this multiplies all of them */
@@ -341,6 +344,10 @@ export interface SceneConfig {
       count: number;
       pointSize: number;
       opacity: number;
+      /** Phase 12.7 (Ali): plume brightness ×1.5. A COLOUR multiplier, not an opacity — the scene
+       *  buffer is half-float (Phase 12.1), so a value > 1 feeds bloom's bright pass instead of
+       *  clipping at white, which is what makes the spray above the head read as glowing. */
+      brightness: number;
       seed: number;
     };
   };
@@ -499,7 +506,7 @@ export const sceneConfig: SceneConfig = {
     ringBreath: { amount: 0.03, period: 6, stagger: 0.7 },
     neckPulse: { strands: [1, 4], dash: 0.05, gap: 0.5, speed: 0.3 },
   },
-  perf: { dprCapWidth: 1000, dprCap: 1.5, dprMax: 2, mobileWidth: 768, mobileColsFactor: 0.5 },
+  perf: { dprCapWidth: 1000, dprCap: 1.5, dprMax: 2, mobileWidth: 768, mobileCountFactor: 0.5 },
 
   // Ali's starting sizes (landscape nodes 0.03–0.07) were ~2 px at this depth: edges dominated.
   // ×3 made the nodes the hero (docs/screens/phase-10/10-1.png); ratios unchanged.
@@ -685,29 +692,37 @@ export const sceneConfig: SceneConfig = {
   // box around the bust (the Phase 10.4 400-point disc on `rings.drift` was too sparse to read
   // as atmosphere), plus a 1,500-point plume spraying out of the crown. The crown y is the
   // canonical head top 0.9 × `bust.glb.scale` 1.6 + `bust.glb.offset` y 0.65 = 2.09.
+  // Phase 12.7 (Ali): the ambient pass of the glow phase — "a visible particle plume above the
+  // head, dust everywhere". Dust 2,500 → 8,000 at ×3 the size variance, so the haze has near
+  // specks and far ones instead of one uniform grain; the plume 1,500 → 5,000 out of a wider
+  // base (0.25 → 0.35) and half a unit higher (1.2 → 1.6) at ×1.5 the colour. Both counts —
+  // like every count in the scene — halve below `perf.mobileWidth` (motion.ts `sceneCount`).
   dust: {
     ambient: {
       center: [0, 0.8, -0.4],
       size: [6, 4, 3],
-      count: 2500,
+      count: 8000,
       pointSize: 0.01,
       opacity: 0.35,
-      sizeJitter: [0.6, 1.4],
+      // Phase 12.7: size variance ×3 — the ±0.4 spread becomes ±1.2, clamped at 0.2 so no
+      // sprite vanishes
+      sizeJitter: [0.2, 2.2],
       opacityJitter: [0.5, 1],
       drift: { amount: 0.08, period: 12 },
       seed: 19,
     },
     plume: {
       crown: [0, 2.09, 0],
-      baseRadius: 0.25,
+      baseRadius: 0.35,
       topRadius: 0.1,
-      height: 1.2,
+      height: 1.6,
       period: 6,
       speedJitter: [0.7, 1.3],
       wobble: 0.04,
-      count: 1500,
+      count: 5000,
       pointSize: 0.015,
       opacity: 0.6,
+      brightness: 1.5,
       seed: 23,
     },
   },

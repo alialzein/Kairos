@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { mulberry32 } from "@/avatar/sim/random";
 import { starPositions } from "./gen/stars";
 import { currentVerticalFov } from "./framing";
+import { sceneCount } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { createPointSprites } from "./tsl";
 
@@ -18,7 +19,7 @@ export function Stars() {
     const { stars, camera, palette } = sceneConfig;
     const points = starPositions(
       {
-        count: stars.count,
+        count: sceneCount(stars.count), // Phase 12.7: half the stars on mobile
         radius: stars.radius,
         depth: stars.depth,
         fovDeg: currentVerticalFov(),
