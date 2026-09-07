@@ -63,6 +63,21 @@ export interface SceneConfig {
       armCrop: { xMin: number; yMin: number; yMax: number };
       skirtBelow: number;
       skirtTo: number;
+      /** cavities closed in the mesh (canonical units): the eye slits — the GLB bakes lids with
+       *  an open slit and an eyeball 0.13 behind them into its single mesh (no eye node to hide;
+       *  Ali, feedback round 1 Phase 2 — the reference has no eyes). The lids are laid onto a
+       *  quadric fitted to the surrounding skin and the eyeball is parked `recess` behind it.
+       *  Ears are untouched. */
+      cavities: {
+        yMin: number;
+        yMax: number;
+        xMin: number;
+        xMax: number;
+        zMin: number;
+        sheetZ: number;
+        recess: number;
+        feather: number;
+      }[];
     };
     headCenter: Vec3;
     headRadius: number;
@@ -260,6 +275,19 @@ export const sceneConfig: SceneConfig = {
       armCrop: { xMin: 0.6, yMin: -0.89, yMax: -0.2 },
       skirtBelow: -0.75,
       skirtTo: -1.6,
+      // eye slits: lids at z ≈ 0.38, slit y 0.352–0.389, eyeball at z ≈ 0.245 (measured)
+      cavities: [
+        {
+          yMin: 0.3,
+          yMax: 0.46,
+          xMin: 0.04,
+          xMax: 0.22,
+          zMin: 0.2,
+          sheetZ: 0.33,
+          recess: 0.004,
+          feather: 0.03,
+        },
+      ],
     },
     headCenter: [0, 1.45, 0],
     headRadius: 0.5,

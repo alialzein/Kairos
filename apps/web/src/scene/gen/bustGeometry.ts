@@ -115,6 +115,101 @@ export function straightenArmCrops(
   }
 }
 
+export interface Cavity {
+  /** canonical box of the cavity (|x| symmetric, front half via zMin) */
+  yMin: number;
+  yMax: number;
+  xMin: number;
+  xMax: number;
+  zMin: number;
+  /** vertices with z ≥ sheetZ are the outer sheet (skin + lids), below it the inner sheet */
+  sheetZ: number;
+  /** how far behind the fitted skin the inner sheet is parked (0 = flush) */
+  recess: number;
+  /** blend-out width at the box's x/y edges so the patch never steps */
+  feather: number;
+}
+
+/**
+ * Closes a cavity in the skin — the eye slits of the bust mesh (Ali, feedback round 1 Phase 2:
+ * the reference has no eyes; the GLB bakes lids with an open slit and an eyeball 0.13 behind
+ * them into its single mesh, so there is no node to hide and smoothing cannot close a hole).
+ * A quadric z(x, y) is least-squares-fitted to the outer sheet inside the box; the outer sheet
+ * is laid onto it (the lid folds vanish) and the inner sheet is pulled forward to `recess`
+ * behind it, so the slit becomes a flush patch whose walls are edge-on to the camera. The move
+ * is feathered toward the box edges. Pure, in place, canonical units. Returns the number of
+ * vertices moved.
+ */
+export function flattenCavity(positions: Float32Array, c: Cavity): number {
+  const n = positions.length / 3;
+  const inside: number[] = [];
+  const weight: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const x = Math.abs(positions[i * 3] ?? 0);
+    const y = positions[i * 3 + 1] ?? 0;
+    const z = positions[i * 3 + 2] ?? 0;
+    if (x < c.xMin || x > c.xMax || y < c.yMin || y > c.yMax || z < c.zMin) continue;
+    const edge = Math.min(x - c.xMin, c.xMax - x, y - c.yMin, c.yMax - y);
+    const w = c.feather > 0 ? Math.min(1, edge / c.feather) : 1;
+    if (w <= 0) continue;
+    inside.push(i);
+    weight.push(w);
+  }
+  // least squares z = a + b·x + c·y + d·x² + e·xy + f·y² over the outer sheet (|x| used, so the
+  // fit is mirror-symmetric and one solve serves both eyes)
+  const basis = (x: number, y: number) => [1, x, y, x * x, x * y, y * y];
+  const ata = Array.from({ length: 6 }, () => new Array<number>(6).fill(0));
+  const atz = new Array<number>(6).fill(0);
+  let outer = 0;
+  for (const i of inside) {
+    const z = positions[i * 3 + 2] ?? 0;
+    if (z < c.sheetZ) continue;
+    outer++;
+    const b = basis(Math.abs(positions[i * 3] ?? 0), positions[i * 3 + 1] ?? 0);
+    for (let r = 0; r < 6; r++) {
+      atz[r] = (atz[r] ?? 0) + (b[r] ?? 0) * z;
+      for (let q = 0; q < 6; q++) ata[r]![q] = (ata[r]![q] ?? 0) + (b[r] ?? 0) * (b[q] ?? 0);
+    }
+  }
+  if (outer < 6) return 0;
+  const coef = solve(ata, atz);
+  if (!coef) return 0;
+  let moved = 0;
+  inside.forEach((i, k) => {
+    const x = Math.abs(positions[i * 3] ?? 0);
+    const y = positions[i * 3 + 1] ?? 0;
+    const z = positions[i * 3 + 2] ?? 0;
+    const b = basis(x, y);
+    let fit = 0;
+    for (let r = 0; r < 6; r++) fit += (coef[r] ?? 0) * (b[r] ?? 0);
+    const target = z >= c.sheetZ ? fit : fit - c.recess;
+    const w = weight[k] ?? 0;
+    positions[i * 3 + 2] = z + (target - z) * w;
+    moved++;
+  });
+  return moved;
+}
+
+/** Gaussian elimination with partial pivoting for the small normal-equation system. */
+function solve(a: number[][], b: number[]): number[] | null {
+  const n = b.length;
+  const m = a.map((row, i) => [...row, b[i] ?? 0]);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++)
+      if (Math.abs(m[r]![col] ?? 0) > Math.abs(m[pivot]![col] ?? 0)) pivot = r;
+    const pr = m[pivot]!;
+    if (Math.abs(pr[col] ?? 0) < 1e-12) return null;
+    [m[col], m[pivot]] = [pr, m[col]!];
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = (m[r]![col] ?? 0) / (m[col]![col] ?? 1);
+      for (let q = col; q <= n; q++) m[r]![q] = (m[r]![q] ?? 0) - f * (m[col]![q] ?? 0);
+    }
+  }
+  return m.map((row, i) => (row[n] ?? 0) / (row[i] ?? 1));
+}
+
 /**
  * Smooth-shaded geometry from a raw triangle soup (the repo's bust.glb via `loadBust`): welds
  * split vertices so `computeVertexNormals` yields smooth normals for the fresnel rim, then
@@ -132,6 +227,8 @@ export function meshBust(
      *  below the frame as straight walls */
     skirtBelow?: number;
     skirtTo?: number;
+    /** cavities to close before scaling (the baked-in eye slits) */
+    cavities?: readonly Cavity[];
   },
 ): BufferGeometry {
   const raw = new BufferGeometry();
@@ -142,6 +239,10 @@ export function meshBust(
   const p = g.getAttribute("position");
   if (transform.armCrop) {
     straightenArmCrops(p.array as Float32Array, g.getIndex()?.array ?? [], transform.armCrop);
+    p.needsUpdate = true;
+  }
+  for (const cavity of transform.cavities ?? []) {
+    flattenCavity(p.array as Float32Array, cavity);
     p.needsUpdate = true;
   }
   if (transform.skirtBelow !== undefined && transform.skirtTo !== undefined) {

@@ -1,7 +1,13 @@
 import { Box3, type BufferAttribute } from "three";
 import { describe, expect, it } from "vitest";
 import { sceneConfig } from "../sceneConfig";
-import { boundaryVertices, meshBust, primitiveBust, straightenArmCrops } from "./bustGeometry";
+import {
+  boundaryVertices,
+  flattenCavity,
+  meshBust,
+  primitiveBust,
+  straightenArmCrops,
+} from "./bustGeometry";
 
 describe("primitiveBust", () => {
   const b = sceneConfig.bust;
@@ -101,5 +107,62 @@ describe("meshBust", () => {
     expect(p.getY(0)).toBeCloseTo(-3);
     expect(p.getY(1)).toBeCloseTo(-3);
     expect(p.getY(2)).toBeCloseTo(1);
+  });
+});
+
+describe("flattenCavity", () => {
+  /** an outer skin on the quadric z = 0.4 − 0.5x² − 0.3(y − 0.4)² with a slit, an eyeball sheet
+   *  0.13 behind it, and skin outside the box */
+  const skin = (x: number, y: number) => 0.4 - 0.5 * x * x - 0.3 * (y - 0.4) ** 2;
+  const build = () => {
+    const pts: number[] = [];
+    const kind: string[] = [];
+    for (let x = -0.3; x <= 0.3; x += 0.01) {
+      for (let y = 0.2; y <= 0.55; y += 0.01) {
+        const ax = Math.abs(x);
+        const inBox = ax >= 0.04 && ax <= 0.22 && y >= 0.3 && y <= 0.46;
+        const inSlit = inBox && ax > 0.08 && ax < 0.18 && y > 0.352 && y < 0.389;
+        if (inSlit) {
+          pts.push(x, y, 0.25); // eyeball seen through the slit
+          kind.push("eye");
+        } else {
+          const lid = inBox && Math.abs(y - 0.37) < 0.03 ? 0.01 : 0; // lid fold relief
+          pts.push(x, y, skin(x, y) + lid);
+          kind.push(inBox ? "outer" : "outside");
+        }
+      }
+    }
+    return { positions: Float32Array.from(pts), kind };
+  };
+  const cavity = {
+    yMin: 0.3,
+    yMax: 0.46,
+    xMin: 0.04,
+    xMax: 0.22,
+    zMin: 0.2,
+    sheetZ: 0.33,
+    recess: 0.004,
+    feather: 0.03,
+  };
+  it("lays the lids on the fitted skin, parks the eyeball just behind it, leaves the outside", () => {
+    const { positions, kind } = build();
+    const before = positions.slice();
+    const moved = flattenCavity(positions, cavity);
+    expect(moved).toBeGreaterThan(0);
+    for (let i = 0; i < kind.length; i++) {
+      const x = positions[i * 3] ?? 0;
+      const y = positions[i * 3 + 1] ?? 0;
+      const z = positions[i * 3 + 2] ?? 0;
+      const ax = Math.abs(x);
+      const edge = Math.min(ax - 0.04, 0.22 - ax, y - 0.3, 0.46 - y);
+      if (kind[i] === "outside") expect(z).toBe(before[i * 3 + 2]);
+      else if (edge >= 0.03 && kind[i] === "eye")
+        expect(Math.abs(z - (skin(x, y) - 0.004))).toBeLessThan(0.008);
+      else if (edge >= 0.03) expect(Math.abs(z - skin(x, y))).toBeLessThan(0.008);
+    }
+  });
+  it("does nothing without an outer sheet to fit", () => {
+    const positions = Float32Array.from([0.1, 0.4, 0.25, 0.12, 0.4, 0.25]);
+    expect(flattenCavity(positions, cavity)).toBe(0);
   });
 });
