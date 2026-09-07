@@ -63,6 +63,11 @@ function FrameTicker({ waitForBust, onReady }: { waitForBust: boolean; onReady?:
 
 const gradient = `linear-gradient(180deg, ${sceneConfig.palette.bgTop} 0%, ${sceneConfig.palette.bgBottom} 100%)`;
 
+/** the slice of GPUDevice the factory reads (no @webgpu/types in the repo) */
+interface LostReporter {
+  lost: Promise<{ reason?: string; message: string }>;
+}
+
 /** one renderer per canvas element, shared by any re-entrant factory call (see makeRenderer) */
 const inflight = new WeakMap<HTMLCanvasElement, Promise<WebGPURenderer>>();
 const pendingDispose = new WeakMap<object, ReturnType<typeof setTimeout>>();
@@ -128,11 +133,11 @@ export function SceneCanvas({
       if (existing) return existing;
       const promise = (async () => {
         const { WebGPURenderer } = await import("three/webgpu");
-        // antialias: the scene pass inherits renderer.samples (4), which the fat lines and the
-        // thin rings need for smooth edges
+        // antialias: the scene pass inherits renderer.samples (4 when on), which the fat lines
+        // and the thin rings need for smooth edges
         const renderer = new WebGPURenderer({
           canvas,
-          antialias: true,
+          antialias: sceneConfig.render.antialias,
           powerPreference: "high-performance",
           forceWebGL: !!forceWebGL,
         });
@@ -140,6 +145,15 @@ export function SceneCanvas({
         renderer.setClearColor(new Color(sceneConfig.palette.bgBottom), 1);
         const backend = "isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl";
         setTimeout(() => useSceneStore.getState().setBackend(backend), 0);
+        // a lost WebGPU device (GPU process crash, driver reset) is otherwise silent: three logs
+        // it but nothing reaches the bench. "destroyed" is our own dispose (RendererLifecycle).
+        const device = (renderer.backend as { device?: LostReporter }).device;
+        device?.lost.then((info) => {
+          if (info.reason === "destroyed") return;
+          const message = `webgpu device lost: ${info.reason ?? "unknown"} ${info.message}`;
+          console.error(`scene: ${message}`);
+          useSceneStore.getState().setError(message);
+        });
         return renderer;
       })();
       inflight.set(canvas, promise);

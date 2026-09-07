@@ -28,6 +28,11 @@ export type Layers = Record<LayerName, boolean>;
 export interface SceneConfig {
   layers: Layers;
   camera: { position: Vec3; fov: number; lookAt: Vec3; near: number; far: number };
+  render: {
+    /** 4× MSAA on the scene pass (the fat lines and the thin rings need it for smooth edges);
+     *  off = 1 sample. `?set=render.antialias:false` on the bench */
+    antialias: boolean;
+  };
   palette: {
     bgTop: string;
     bgBottom: string;
@@ -231,6 +236,8 @@ export const sceneConfig: SceneConfig = {
   },
 
   camera: { position: [0, 1.0, 5.5], fov: 32, lookAt: [0, 1.05, 0], near: 0.1, far: 200 },
+
+  render: { antialias: true },
 
   palette: {
     bgTop: "#020B1F",
