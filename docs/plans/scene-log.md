@@ -302,6 +302,60 @@ dominated.
 Not touched, per Ali: camera, colours, bloom, HUD. Frame time with every layer on stayed at the
 display cap (p50 5.0 ms / p95 ≤ 7.6 ms on the RTX 5070 during the screenshots).
 
+## Phase 11 (Ali, 2026-09-07) — density pass
+
+Still on PR #30, not merged until Ali approves the 11.4 screenshot. Ali's verdict on Phase 10:
+structure right, particle counts ~10× too low, and `particles.sizeScale` 3 hid it. Global:
+sizeScale 3 → 1.5 — "density makes the glow, not point size". Budget: total points under
+~150k, one object per sub-layer, no per-frame allocations; p50 frame time reported after 11.4.
+One commit + screenshot per item, `docs/screens/phase-11/`.
+
+1. **11.1 Landscape.** `11-1.png`. Grid 36 × 14 → 160 × 40 per side (12,880 nodes, jitter
+   kept; `zStep` −0.1167 keeps the z range), k-nearest edges max 0.35 → 0.12 at opacity 0.12
+   (the kNN moved to a grid hash: 110 ms for both sides), node size ÷2, gold 12 % → 8 %,
+   amplitude 2.0 × (0.5 + 0.5·smoothstep(1.2, 4.0, |x|)) replacing the old |x| falloff so the
+   ridges rise to head height at the frame edges, bottom fade only in y −0.75..−0.45 (nothing
+   else fades), dust 300 → 4,000 per side within 0.25 of the surface (uniform over nodes; size
+   0.01, alpha 0.4). One value Ali did not name: `baseY` −1.2 → −0.7 — with the new fade window
+   the near 30 rows were fully transparent and the sides still emptied below the shoulders;
+   the base now sits at the frame's bottom edge and the slope fills each side. Observation for
+   Ali: nodes with h ≤ 0 sit on the base plane, so the grid's far edge shows as a faint
+   straight horizon at the plateau level; letting negative h dip (a valley term) would break
+   it if wanted.
+
+   Frame-time note: this Chrome session's rAF is capped at 60 Hz (16.7 ms p50 even with only
+   background + stars; the display reports 200 Hz), so p50 is measured with vsync off from
+   here on: full scene 0.8 ms p50 / 1.5 ms p95 after 11.1.
+
+2. **11.2 Bust shell + line contrast.** `11-2.png`. Shell 25k → 80k points, size ×0.5,
+   alpha = 0.03 + 0.6·fresnel (`alphaMin` / new `alphaRim`; was 0.15 + 0.85): a soft mist at
+   the silhouette, no visible dots; tint static, no pulse (agreed). Fill #041634 → #020C22,
+   lineWidth 0.05 → 0.04. Sampling 80k points: ~20 ms. Full scene 0.8 ms p50 (vsync off).
+
+3. **11.3 Neck circuitry → branching.** `11-3.png`. Each strand grows 2–3 sub-branches
+   (`neck.branches`): short beziers 0.12–0.3 long leaving at 30–70 % of the strand, rotated
+   0.5–1.1 rad outward/down from the tangent, lifted onto the neck cylinder like the strands, a
+   bright bead (`endBead`) at every branch point and tip. Beads per strand 60 → 120 with random
+   brightness 0.5–1.0, bead size ×0.7, the fat line's folded-in opacity 0.3 → 0.15. 16
+   branches, 1,457 neck sprites in 5 instanced draws. Note: the outermost branch tips pass the
+   neck radius and flatten onto the shoulders (the cylinder lift clamps at |x| ≥ 0.2).
+
+4. **11.4 Global dust + crown plume.** `11-4.png`. New layer `dust` (phase 11): 2,500
+   drifting points in a 6 × 4 × 3 box around the bust (size 0.01, alpha 0.35, the Phase 10
+   drift on TSL time; the old 400-point disc left `Rings`), and the crown plume — 1,500 points
+   in a cone above the head (base radius 0.25 at the crown y 2.09, top radius 0.1, rising 1.2
+   units over 6 s with per-particle speed jitter and a small wobble), alpha = smoothstep(0,
+   0.08, t)·(1 − t) so particles fade in at the base and out with height, respawn by `fract`.
+   No per-frame JS; frozen at the seeded phases under reduced motion.
+
+Budget after 11.4 (sprites): landscape 20,880 (12,880 nodes + 8,000 dust) · shell 80,000 ·
+neck 1,457 · ring beads 2,250 · dust 2,500 · plume 1,500 · stars 400 = **108,987** (< 150k).
+Objects per layer: landscape 5 (blue/gold nodes, dust, blue/gold edges), shell 1, neck 6
+(solid + pulse fat lines, strand/branch/end beads, cluster + core), rings 9 annuli + 9 bead
+sprites (children, so they breathe), dust 2. Frame time on the RTX 5070 at 1280 × 720, vsync
+off: **p50 0.6 ms**, p95 6.1 ms (rAF under the 60 Hz cap of this Chrome session: 16.7 ms).
+WebGL2 fallback renders the same picture with no page errors.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
