@@ -181,15 +181,41 @@ export interface SceneConfig {
      *  instead — the fat-line material stays opaque because a transparent Line2NodeMaterial
      *  composites against a per-frame framebuffer copy + mip chain. Identical over the dark
      *  fill; where strands cross contour lines they cover them instead of letting 10 % through.
-     *  Phase 10.4: the line under the beads */
+     *  Phase 10.4: the line under the beads. Phase 11.3: 0.3 → 0.15 — with the branches and
+     *  twice the beads the strands must read as nerves, and the line is only their trace */
     opacity: number;
     /** how far in front of the neck cylinder the strands sit (plan: 0.02) */
     lift: number;
     /** samples per strand (plan: 40) */
     points: number;
     /** Phase 10.4 (Ali): each strand becomes `perStrand` gold beads over the line — per-bead
-     *  size drawn uniformly from `size` (PointsMaterial units × `particles.sizeScale`) */
-    strandPoints: { perStrand: number; size: [number, number]; opacity: number };
+     *  size drawn uniformly from `size` (PointsMaterial units × `particles.sizeScale`).
+     *  Phase 11.3: 60 → 120 beads at ×0.7 the size, each dimmed by a per-bead multiplier drawn
+     *  uniformly from `brightness` (× `opacity`), so the strands twinkle instead of reading as
+     *  one even string */
+    strandPoints: {
+      perStrand: number;
+      size: [number, number];
+      opacity: number;
+      brightness: [number, number];
+    };
+    /** Phase 11.3 (Ali): every strand sprouts `perStrand` (inclusive range) short sub-branches —
+     *  gold nerves, not a harp. Each leaves its strand at a bezier parameter drawn from `at`
+     *  (30–70 % of the strand's length), runs `length` world units and is beaded like the
+     *  strands. `angle` = radians the branch direction is rotated from the strand's local
+     *  tangent toward outward/down (the tangent runs jaw → node, i.e. downward; the rotation
+     *  sign is the one that turns it away from x = 0). `beadsPerUnit` = bead density along a
+     *  branch — 120 beads over a ≈0.6-unit strand ≈ 200/unit, so branches bead like strands.
+     *  `endBead` = the bright bead at each branch tip and at each branch point (size in
+     *  PointsMaterial units × `particles.sizeScale`). */
+    branches: {
+      perStrand: [number, number];
+      at: [number, number];
+      length: [number, number];
+      angle: [number, number];
+      beadsPerUnit: number;
+      endBead: { size: number; opacity: number };
+    };
     /** sternum node: cluster points + spread, radiating spokes + length, point size in
      *  PointsMaterial units (plan: 0.02; converted to a sprite size at render time), and
      *  (Phase 10.4) one bright `core` sprite at the node centre, same units */
@@ -480,10 +506,19 @@ export const sceneConfig: SceneConfig = {
     controlY: 0.41,
     controlXFactor: 1.3,
     lineWidth: 1.5,
-    opacity: 0.3,
+    opacity: 0.15, // Phase 11.3 (Ali): was 0.3 — the beads and branches carry the strand now
     lift: 0.02,
     points: 40,
-    strandPoints: { perStrand: 60, size: [0.02, 0.03], opacity: 1 },
+    // Phase 11.3 (Ali): 60 → 120 beads, size ×0.7, brightness 0.5–1.0 per bead
+    strandPoints: { perStrand: 120, size: [0.014, 0.021], opacity: 1, brightness: [0.5, 1.0] },
+    branches: {
+      perStrand: [2, 3],
+      at: [0.3, 0.7],
+      length: [0.12, 0.3],
+      angle: [0.5, 1.1],
+      beadsPerUnit: 200,
+      endBead: { size: 0.05, opacity: 1 },
+    },
     node: {
       points: 40,
       spread: 0.06,

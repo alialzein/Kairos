@@ -23,6 +23,12 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  * `strandPoints.size`, seeded off `neck.seed`); the sternum cluster grows to `node.points` 40 and
  * gains one bright `node.core` sprite at its centre. All three sprite layers keep depthTest off
  * and sit above the lines (renderOrder 11 / 12). Static — no per-frame work beyond the dashes.
+ *
+ * Phase 11.3 (Ali) — "gold nerves/veins, not a harp": `neck.branches` sub-branches leave every
+ * strand (see gen/neck.ts). Their fat lines join the solid line object (one draw, the pulse
+ * strands keep their own), their beads are one more sprite layer, and the bright bead at each
+ * branch point and tip is a third. Strand and branch beads are dimmed per bead by the generator's
+ * brightness draws, so the circuitry reads as nerves rather than an even string of lights.
  */
 export function NeckCircuit() {
   const scene = useThree((s) => s.scene);
@@ -39,6 +45,8 @@ export function NeckCircuit() {
         lift: neck.lift,
         points: neck.points,
         strandPoints: neck.strandPoints.perStrand,
+        strandBrightness: neck.strandPoints.brightness,
+        branches: neck.branches,
         node: neck.node,
       },
       mulberry32(neck.seed),
@@ -61,8 +69,12 @@ export function NeckCircuit() {
       const target = isPulse(s) ? pulsed : solid;
       for (let c = 0; c < 6; c++) target.push(circuit.segments[s * 6 + c] ?? 0);
     }
+    // Phase 11.3: the sub-branches are never pulsed, so they ride in the solid object — one draw
+    const solidPositions = new Float32Array(solid.length + circuit.branchSegments.length);
+    solidPositions.set(solid);
+    solidPositions.set(circuit.branchSegments, solid.length);
     const geometry = new LineSegmentsGeometry();
-    geometry.setPositions(Float32Array.from(solid));
+    geometry.setPositions(solidPositions);
     // Not `transparent`: a transparent Line2NodeMaterial composites in-shader against a per-frame
     // framebuffer copy (plus a mip chain); `neck.opacity` is folded into the colour instead (see
     // its comment in sceneConfig).
@@ -108,17 +120,46 @@ export function NeckCircuit() {
     const { particles } = sceneConfig;
     const beadRng = mulberry32(neck.seed + 1);
     const [sizeMin, sizeMax] = neck.strandPoints.size;
-    const beadSizes = new Float32Array(circuit.strandPoints.length / 3);
-    for (let i = 0; i < beadSizes.length; i++)
-      beadSizes[i] = sizeMin + beadRng() * (sizeMax - sizeMin);
+    const drawSizes = (count: number) => {
+      const sizes = new Float32Array(count);
+      for (let i = 0; i < count; i++) sizes[i] = sizeMin + beadRng() * (sizeMax - sizeMin);
+      return sizes;
+    };
+    // strand beads first, then the branch beads: one stream, so both layers stay deterministic
+    const beadSizes = drawSizes(circuit.strandPointCount * circuit.strandCount);
+    const branchSizes = drawSizes(circuit.branchPointCount);
     const beads = createPointSprites({
       points: circuit.strandPoints,
       size: spriteSizeForPointSize(particles.sizeScale, fov),
       sizes: beadSizes,
       color: palette.gold,
       opacity: neck.strandPoints.opacity,
+      // Phase 11.3: per-bead 0.5–1.0 brightness on top of the layer opacity
+      opacities: circuit.strandBrightness,
       depthTest: false,
       renderOrder: 11,
+    });
+
+    // Phase 11.3: the beads along the sub-branches — same sizes, same brightness treatment
+    const branchBeads = createPointSprites({
+      points: circuit.branchPoints,
+      size: spriteSizeForPointSize(particles.sizeScale, fov),
+      sizes: branchSizes,
+      color: palette.gold,
+      opacity: neck.strandPoints.opacity,
+      opacities: circuit.branchBrightness,
+      depthTest: false,
+      renderOrder: 11,
+    });
+
+    // Phase 11.3: the bright bead at every branch point and every branch tip
+    const endBeads = createPointSprites({
+      points: circuit.endPoints,
+      size: spriteSizeForPointSize(neck.branches.endBead.size * particles.sizeScale, fov),
+      color: palette.gold,
+      opacity: neck.branches.endBead.opacity,
+      depthTest: false,
+      renderOrder: 12,
     });
 
     const cluster = createPointSprites({
@@ -140,7 +181,13 @@ export function NeckCircuit() {
       renderOrder: 12,
     });
 
-    const sprites = [beads.sprite, cluster.sprite, core.sprite];
+    const sprites = [
+      beads.sprite,
+      branchBeads.sprite,
+      endBeads.sprite,
+      cluster.sprite,
+      core.sprite,
+    ];
     return {
       objects: pulse ? [lines, pulse.lines, ...sprites] : [lines, ...sprites],
       pulse,
@@ -151,6 +198,8 @@ export function NeckCircuit() {
         pulse?.geometry.dispose();
         pulse?.material.dispose();
         beads.dispose();
+        branchBeads.dispose();
+        endBeads.dispose();
         cluster.dispose();
         core.dispose();
       },
