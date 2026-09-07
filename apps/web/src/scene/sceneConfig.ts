@@ -375,10 +375,11 @@ export const sceneConfig: SceneConfig = {
   // control point (x·0.6, midpoint y), sternum node doubled (points, spread, spokes, size)
   neck: {
     jawY: 0.67,
-    jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22],
+    // round 2 item 3: jaw x scaled by 0.75, control x 0.6·x → 1.3·x (bow outward along the neck)
+    jawXs: [-0.165, -0.105, -0.045, 0.045, 0.105, 0.165],
     nodeY: 0.15,
     controlY: 0.41,
-    controlXFactor: 0.6,
+    controlXFactor: 1.3,
     lineWidth: 1.5,
     opacity: 0.9,
     lift: 0.02,
