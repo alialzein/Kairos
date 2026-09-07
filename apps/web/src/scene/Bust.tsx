@@ -5,6 +5,7 @@ import { type BufferGeometry, Color, FrontSide, Mesh, MeshBasicNodeMaterial } fr
 import { loadBust } from "@/avatar/sim/bust";
 import { createContourMaterial } from "./ContourMaterial";
 import { meshBust, primitiveBust } from "./gen/bustGeometry";
+import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { useSceneStore } from "./store";
 
@@ -53,7 +54,12 @@ export function Bust({ contours }: { contours: boolean }) {
   );
 
   const material = useMemo(() => {
-    if (contours) return createContourMaterial(sceneConfig).material;
+    if (contours) {
+      const { material, uniforms } = createContourMaterial(sceneConfig);
+      // Phase 9: the slow upward line drift is motion — still under reduced motion
+      if (!sceneMotionEnabled()) uniforms.scrollSpeed.value = 0;
+      return material;
+    }
     const m = new MeshBasicNodeMaterial({ color: new Color(sceneConfig.palette.fill) });
     m.side = FrontSide;
     return m;

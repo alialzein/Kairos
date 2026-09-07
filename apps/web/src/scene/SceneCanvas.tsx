@@ -13,6 +13,7 @@ import { Landscape } from "./Landscape";
 import { NeckCircuit } from "./NeckCircuit";
 import { Rings } from "./Rings";
 import { Stars } from "./Stars";
+import { dprFor, sceneMotionEnabled } from "./motion";
 import { sceneConfig, type Layers } from "./sceneConfig";
 import { useSceneStore } from "./store";
 
@@ -25,14 +26,29 @@ export interface SceneCanvasProps {
   onReady?: () => void;
 }
 
-/** Sets the camera target once (the plan's `lookAt` on mount). R3F only applies position/fov
- *  from the `camera` prop and aims at the origin, so the tilt toward `lookAt` is done here. */
+/** Sets the camera target (the plan's `lookAt` on mount). R3F only applies position/fov from
+ *  the `camera` prop and aims at the origin, so the tilt toward `lookAt` is done here. Phase 9:
+ *  the camera drifts ±`motion.cameraDrift.x` on x over `period` (sine), re-aiming every frame
+ *  so the composition never moves; still under reduced motion. Uniform updates only. */
 function SceneCamera() {
   const camera = useThree((s) => s.camera);
+  const drift = useMemo(() => {
+    const { cameraDrift } = sceneConfig.motion;
+    return sceneMotionEnabled() && cameraDrift.x !== 0 && cameraDrift.period > 0
+      ? { x: cameraDrift.x, omega: (Math.PI * 2) / cameraDrift.period }
+      : null;
+  }, []);
+  const baseX = sceneConfig.camera.position[0];
+  const [lx, ly, lz] = sceneConfig.camera.lookAt;
   useEffect(() => {
-    const [x, y, z] = sceneConfig.camera.lookAt;
-    camera.lookAt(x, y, z);
-  }, [camera]);
+    camera.lookAt(lx, ly, lz);
+  }, [camera, lx, ly, lz]);
+  // the frame state's camera (not the hook's value) so the lint's immutability rule is happy
+  useFrame(({ camera: cam, clock }) => {
+    if (!drift) return;
+    cam.position.x = baseX + drift.x * Math.sin(clock.elapsedTime * drift.omega);
+    cam.lookAt(lx, ly, lz);
+  });
   return null;
 }
 
@@ -167,6 +183,14 @@ export function SceneCanvas({
   );
 
   const { position, fov, near, far } = sceneConfig.camera;
+  // Phase 9 perf: dpr ≤ perf.dprCap below perf.dprCapWidth px, ≤ perf.dprMax above (plan [1, 2])
+  const dpr = useMemo(
+    () =>
+      typeof window === "undefined"
+        ? 1
+        : dprFor(window.innerWidth, window.devicePixelRatio, sceneConfig.perf),
+    [],
+  );
   return (
     <div
       className={className}
@@ -177,7 +201,7 @@ export function SceneCanvas({
           post composer never tone-maps, so its palette is meant to reach the screen untouched;
           three/webgpu tone-maps the whole frame once at output (material.toneMapped is inert),
           which only `flat` switches off. Colours still convert linear → sRGB. */}
-      <Canvas flat dpr={[1, 2]} camera={{ position, fov, near, far }} gl={makeRenderer}>
+      <Canvas flat dpr={dpr} camera={{ position, fov, near, far }} gl={makeRenderer}>
         <SceneCamera />
         {layers.background ? <Background /> : null}
         {layers.stars ? <Stars /> : null}

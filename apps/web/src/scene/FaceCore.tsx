@@ -3,6 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { float, oneMinus, sin, time, uv, vec4 } from "three/tsl";
 import { AdditiveBlending, Sprite, SpriteNodeMaterial } from "three/webgpu";
+import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { colorVec3 } from "./tsl";
 
@@ -22,7 +23,8 @@ export function FaceCore() {
     const { core, palette } = sceneConfig;
     const material = new SpriteNodeMaterial();
     const r = float(uv().sub(0.5).mul(2).length());
-    const wave = sin(time.mul(core.pulseSpeed));
+    // Phase 9: no breathing under reduced motion (a constant wave of 0)
+    const wave = sin(time.mul(sceneMotionEnabled() ? core.pulseSpeed : 0));
     const pulse = float(oneMinus(core.pulseAmount)).add(float(core.pulseAmount).mul(wave));
     material.colorNode = vec4(colorVec3(palette.core), 1);
     material.opacityNode = float(oneMinus(r)).clamp(0, 1).mul(core.glow.alpha).mul(pulse);

@@ -33,6 +33,32 @@ export interface SceneConfig {
      *  off = 1 sample. `?set=render.antialias:false` on the bench */
     antialias: boolean;
   };
+  /** Phase 9 — motion (docs/plans/scene-plan.md Phase 9 + the optional items of Phases 5/6,
+   *  approved by Ali 2026-09-07). Periods in seconds. Everything here stops under reduced motion. */
+  motion: {
+    /** "auto": follow the OS `prefers-reduced-motion`; "reduce": always still; "full": always
+     *  animate. `?set=motion.reducedMotion:reduce` previews the still scene */
+    reducedMotion: "auto" | "reduce" | "full";
+    /** camera x = ±x over `period` (plan: ±0.05 over ~12 s) */
+    cameraDrift: { x: number; period: number };
+    /** landscape gold opacity between from and to (plan: 0.6..0.9, slow) */
+    goldShimmer: { from: number; to: number; period: number };
+    /** rings scale 1 → 1 + amount → 1 over `period`, `stagger` radians between rings (plan
+     *  Phase 6 optional: 1.03 over ~6 s) */
+    ringBreath: { amount: number; period: number; stagger: number };
+    /** plan Phase 5 optional: a travelling pulse on 1–2 strands — those strands are drawn
+     *  dashed (dash/gap in world units) with the dash offset moving at `speed` units/s */
+    neckPulse: { strands: number[]; dash: number; gap: number; speed: number };
+  };
+  /** Phase 9 — performance (plan: dpr ≤ 1.5 below 1000 px, half the landscape columns on
+   *  mobile). Widths in CSS px. */
+  perf: {
+    dprCapWidth: number;
+    dprCap: number;
+    dprMax: number;
+    mobileWidth: number;
+    mobileColsFactor: number;
+  };
   palette: {
     bgTop: string;
     bgBottom: string;
@@ -260,6 +286,15 @@ export const sceneConfig: SceneConfig = {
   camera: { position: [0, 1.0, 6.0], fov: 32, lookAt: [0, 1.05, 0], near: 0.1, far: 200 },
 
   render: { antialias: true },
+
+  motion: {
+    reducedMotion: "auto",
+    cameraDrift: { x: 0.05, period: 12 },
+    goldShimmer: { from: 0.6, to: 0.9, period: 9 },
+    ringBreath: { amount: 0.03, period: 6, stagger: 0.7 },
+    neckPulse: { strands: [1, 4], dash: 0.05, gap: 0.5, speed: 0.3 },
+  },
+  perf: { dprCapWidth: 1000, dprCap: 1.5, dprMax: 2, mobileWidth: 768, mobileColsFactor: 0.5 },
 
   palette: {
     bgTop: "#020B1F",

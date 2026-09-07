@@ -1,8 +1,9 @@
 "use client";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { Color, DoubleSide, Group, Mesh, MeshBasicNodeMaterial, RingGeometry } from "three/webgpu";
 import { ringSpecs } from "./gen/rings";
+import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 
 /**
@@ -38,6 +39,7 @@ export function Rings() {
     }
     return {
       group,
+      meshes,
       dispose() {
         for (const mesh of meshes) {
           mesh.geometry.dispose();
@@ -46,6 +48,22 @@ export function Rings() {
       },
     };
   }, []);
+  // Phase 9 (plan Phase 6 optional): every ring breathes 1 → 1 + amount → 1 over `period`
+  // with a per-ring phase offset; scale-only updates, nothing allocated; still under reduced
+  // motion
+  const breath = useMemo(() => {
+    const b = sceneConfig.motion.ringBreath;
+    return sceneMotionEnabled() && b.amount > 0 && b.period > 0
+      ? { amount: b.amount, omega: (Math.PI * 2) / b.period, stagger: b.stagger }
+      : null;
+  }, []);
+  useFrame(({ clock }) => {
+    if (!breath) return;
+    const t = clock.elapsedTime * breath.omega;
+    built.meshes.forEach((mesh, i) => {
+      mesh.scale.setScalar(1 + breath.amount * 0.5 * (1 + Math.sin(t + i * breath.stagger)));
+    });
+  });
 
   useEffect(() => {
     scene.add(built.group);

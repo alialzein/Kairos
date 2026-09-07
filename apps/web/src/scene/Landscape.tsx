@@ -12,7 +12,9 @@ import {
 import { makeNoise } from "@/avatar/sim/noise";
 import { mulberry32 } from "@/avatar/sim/random";
 import { landscape } from "./gen/landscape";
+import { landscapeCols, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
+import { float, sin, time } from "three/tsl";
 import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 
 /**
@@ -25,7 +27,11 @@ import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 export function Landscape() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { landscape: l, palette, camera } = sceneConfig;
+    const { landscape: base, palette, camera, perf, motion } = sceneConfig;
+    // Phase 9 perf: half the columns on mobile widths
+    const cols =
+      typeof window === "undefined" ? base.cols : landscapeCols(window.innerWidth, base.cols, perf);
+    const l = { ...base, cols };
     const n3 = makeNoise(l.noiseSeed);
     const mesh = landscape(l, (x, y) => n3(x, y, 0), mulberry32(l.seed));
 
@@ -46,6 +52,16 @@ export function Landscape() {
     };
     const blue = lines(mesh.blue, palette.landscape, l.blueOpacity);
     const gold = lines(mesh.gold, palette.gold, l.goldOpacity);
+    // Phase 9: gold shimmer — opacity between from and to on TSL time (no per-frame JS work);
+    // the plan's "if a shimmer is wanted, animate the gold opacity between 0.6 and 0.9 slowly"
+    const { goldShimmer } = motion;
+    if (sceneMotionEnabled() && goldShimmer.period > 0) {
+      const mid = (goldShimmer.from + goldShimmer.to) / 2;
+      const half = (goldShimmer.to - goldShimmer.from) / 2;
+      gold.material.opacityNode = float(mid).add(
+        sin(time.mul((Math.PI * 2) / goldShimmer.period)).mul(half),
+      );
+    }
     const points = createPointSprites({
       points: mesh.points,
       size: spriteSizeForPointSize(l.pointSize, camera.fov),
