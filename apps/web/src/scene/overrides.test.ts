@@ -10,15 +10,20 @@ describe("applyOverrides", () => {
   });
 
   it("sets numbers, strings and booleans by dotted path", () => {
-    const c = make();
+    const c = { ...make(), flags: { post: true } };
     const applied = applyOverrides(
       c,
-      "contours.frequency:40, palette.line:#ffffff ,layers.post:false",
+      "contours.frequency:40, palette.line:#ffffff ,flags.post:false",
     );
     expect(c.contours.frequency).toBe(40);
     expect(c.palette.line).toBe("#ffffff");
-    expect(c.layers.post).toBe(false);
-    expect(applied).toEqual(["contours.frequency=40", "palette.line=#ffffff", "layers.post=false"]);
+    expect(c.flags.post).toBe(false);
+    expect(applied).toEqual(["contours.frequency=40", "palette.line=#ffffff", "flags.post=false"]);
+  });
+  it("ignores layer flags (they have their own phase/only/off params)", () => {
+    const c = make();
+    expect(applyOverrides(c, "layers.post:false,layers:1")).toEqual([]);
+    expect(c.layers.post).toBe(true);
   });
   it("sets numeric vectors with | separators when the length matches", () => {
     const c = make();

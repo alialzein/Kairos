@@ -14,6 +14,9 @@ export function applyOverrides(target: object, spec: string | undefined): string
     const raw = item.slice(i + 1).trim();
     const last = path.pop();
     if (!last) continue;
+    // layer flags have their own query params (phase / only / off) and are resolved before the
+    // overrides run, so `layers.*` here would only confuse: ignored on purpose
+    if (path[0] === "layers" || (path.length === 0 && last === "layers")) continue;
     let node: unknown = target;
     for (const key of path) {
       if (node !== null && typeof node === "object" && key in node)

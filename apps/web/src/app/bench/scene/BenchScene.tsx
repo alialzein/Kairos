@@ -62,7 +62,8 @@ export function BenchScene({
 }: {
   query: LayerQuery;
   webgl: boolean;
-  /** `?set=contours.frequency:40,...` tuning overrides applied to sceneConfig before mount */
+  /** `?set=contours.frequency:40,...` tuning overrides applied to sceneConfig before mount
+   *  (`layers.*` is ignored — use `phase` / `only` / `off`) */
   set?: string;
 }) {
   // stable for the life of the page: the canvas parent must not re-render (ledger, Task 7)
