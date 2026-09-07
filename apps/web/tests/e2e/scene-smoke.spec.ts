@@ -22,13 +22,9 @@ test("scene bench page boots on WebGPU or WebGL and keeps rendering", async ({ p
     first?.frames ?? 0,
     { timeout: 60_000 },
   );
-  // scene frames (the canvas publishes its frame-time window every 30 frames): CI only, because
-  // local headless Chromium accumulates no frame stats on this PC (ledger, "PC session" — the
-  // perf spec has the same limitation)
-  if (process.env.CI)
-    await page.waitForFunction(() => (window.__twinScene?.stats.count ?? 0) >= 30, null, {
-      timeout: 60_000,
-    });
+  // (the frame-stats window is checked on the light phase-1 page below: after Phase 11 the full
+  // scene is ~109k sprites, and software WebGL2 on the runner cannot sample 30 of its frames
+  // inside the timeout — run 34157122820)
   expect(errors).toEqual([]);
   // HUD chrome (Phase 8) is plain DOM beside the canvas
   await expect(page.locator("[data-scene-hud]")).toHaveText(/status: listening/i);
@@ -39,4 +35,11 @@ test("layers can be switched from the query string", async ({ page }) => {
   await page.waitForFunction(() => window.__twinScene?.ready === true, null, { timeout: 60_000 });
   const layers = await page.evaluate(() => window.__twinScene?.layers);
   expect(layers).toMatchObject({ stars: true, bust: false, post: false, hud: false });
+  // the canvas publishes its frame-time window every 30 frames: CI only, because local headless
+  // Chromium accumulates no frame stats on this PC (ledger, "PC session" — the perf spec has the
+  // same limitation); checked here on the light page so it measures the window, not the runner
+  if (process.env.CI)
+    await page.waitForFunction(() => (window.__twinScene?.stats.count ?? 0) >= 30, null, {
+      timeout: 60_000,
+    });
 });

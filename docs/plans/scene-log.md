@@ -356,6 +356,12 @@ sprites (children, so they breathe), dust 2. Frame time on the RTX 5070 at 1280 
 off: **p50 0.6 ms**, p95 6.1 ms (rAF under the 60 Hz cap of this Chrome session: 16.7 ms).
 WebGL2 fallback renders the same picture with no page errors.
 
+CI after 11.4 (run 34157122820): the scene smoke booted and kept rendering on the runner's
+software WebGL2, but its CI-only wait for 30 sampled frames timed out — SwiftShader cannot push
+~109k additive sprites through 30 frames in 60 s. The full-scene test keeps the "keeps
+rendering" progress check; the frame-stats check moved to the light phase-1 page, where it still
+proves the stats window publishes. Verified locally with `CI=1` on a production build.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
