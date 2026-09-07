@@ -188,27 +188,24 @@ export interface SceneConfig {
     xEnd: number;
     /** number of x intervals per side: cols + 1 points, x reaching xEnd (plan `0..cols`) */
     cols: number;
-    /** exact row count. The plan's `0..rows` could also read as rows + 1 (7 rows, z to −2.9);
-     *  6 rows are built — Ali's call if the deeper grid is wanted */
+    /** exact row count (round 3: 14 rows, z from zStart back by zStep) */
     rows: number;
     zStart: number;
     zStep: number;
+    /** y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·falloff (round 3 heightfield: far
+     *  rows are the peaks, near rows drop below the frame) */
     baseY: number;
     amplitude: number;
+    slope: number;
+    /** bottom fade: vertex opacity × smoothstep(fade[0], fade[1], y) */
+    fade: [number, number];
     /** smoothstep edges on |x| that keep the ridges off the bust: [start, end] (plan 1.2, 2.2;
      *  the plan's feedback example "falloff start 1.2 → 1.6" tunes `falloff[0]`) */
     falloff: [number, number];
-    /** y dropped per row going back (plan 0.05) */
-    rowSink: number;
-    /** two-octave ridge: noise2D(x·lowScale, j·rowScale)·lowWeight +
-     *  noise2D(x·highScale, j·rowScale)·highWeight (plan 0.55/0.7, 1.6/0.25, row 0.7) */
-    ridge: {
-      lowScale: number;
-      lowWeight: number;
-      highScale: number;
-      highWeight: number;
-      rowScale: number;
-    };
+    /** two-octave ridge sampled continuously over world (x, z), never per row index:
+     *  h = noise2D(x·lowScale, z·lowScale)·lowWeight + noise2D(x·highScale, z·highScale)·highWeight
+     *  (round 3: 0.35/0.7 + 0.9/0.25) */
+    ridge: { lowScale: number; lowWeight: number; highScale: number; highWeight: number };
     dropout: number;
     goldRatio: number;
     /** PointsMaterial units (px = size · H/2 / depth); converted to a sprite size at render time */
@@ -318,7 +315,7 @@ export const sceneConfig: SceneConfig = {
       offset: [0, 0.65, -0.2],
       armCrop: { xMin: 0.6, yMin: -0.89, yMax: -0.2 },
       skirtBelow: -0.75,
-      skirtTo: -1.6,
+      skirtTo: -3.0, // round 3: the bottom edge never shows at any aspect
       // eye slits: lids at z ≈ 0.38, slit y 0.352–0.389, eyeball at z ≈ 0.245 (measured)
       cavities: [
         {
@@ -362,7 +359,7 @@ export const sceneConfig: SceneConfig = {
   // sits lower than a sphere's centre, so the glow is centred on it at y 1.3
   core: {
     center: [0, 1.3, 0.45],
-    radius: 0.35,
+    radius: 0.42, // round 3 (optional, single value): 0.35 → 0.42
     pulseSpeed: 1.5,
     pulseAmount: 0.15,
     glow: { size: 0.9, z: 0.72, alpha: 0.9, scalePulse: 0.5 },
@@ -405,16 +402,17 @@ export const sceneConfig: SceneConfig = {
   landscape: {
     xStart: 1.2,
     xEnd: 4.0,
-    cols: 70,
-    rows: 6,
+    cols: 36,
+    rows: 14,
     zStart: -0.5,
-    zStep: -0.4,
-    // round 2 item 2: ridges rise to about neck height on both sides
-    baseY: -0.2,
+    zStep: -0.35,
+    // round 3: a heightfield sloping down toward the viewer; peaks around neck height
+    baseY: -1.2,
     amplitude: 1.4,
+    slope: 0.2,
+    fade: [-1.2, -0.4],
     falloff: [1.2, 2.2],
-    rowSink: 0.05,
-    ridge: { lowScale: 0.35, lowWeight: 0.7, highScale: 1.6, highWeight: 0.25, rowScale: 0.7 },
+    ridge: { lowScale: 0.35, lowWeight: 0.7, highScale: 0.9, highWeight: 0.25 },
     dropout: 0.55,
     goldRatio: 0.1,
     pointSize: 0.04,

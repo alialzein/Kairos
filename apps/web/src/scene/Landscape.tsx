@@ -15,7 +15,7 @@ import { currentVerticalFov } from "./framing";
 import { landscape } from "./gen/landscape";
 import { landscapeCols, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
-import { float, sin, time } from "three/tsl";
+import { attribute, float, sin, time } from "three/tsl";
 import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 
 /**
@@ -36,38 +36,44 @@ export function Landscape() {
     const n3 = makeNoise(l.noiseSeed);
     const mesh = landscape(l, (x, y) => n3(x, y, 0), mulberry32(l.seed));
 
-    const lines = (segments: Float32Array, hex: string, opacity: number) => {
+    // round 3: every vertex carries the generator's bottom fade (smoothstep on y) — the
+    // surface fades out at the bottom instead of ending on a line
+    // float(): @types/three 0.185.4 types attribute() too loosely for the mul overloads
+    const fadeAttr = float(attribute("fade", "float") as unknown as Parameters<typeof float>[0]);
+    const lines = (segments: Float32Array, fade: Float32Array, hex: string, opacity: number) => {
       const geometry = new BufferGeometry();
       geometry.setAttribute("position", new Float32BufferAttribute(segments, 3));
+      geometry.setAttribute("fade", new Float32BufferAttribute(fade, 1));
       const material = new LineBasicNodeMaterial({
         color: new Color(hex),
         transparent: true,
-        opacity,
         blending: AdditiveBlending,
         depthWrite: false,
       });
       material.fog = false;
+      material.opacityNode = float(opacity).mul(fadeAttr);
       const obj = new LineSegments(geometry, material);
       obj.frustumCulled = false;
       return obj;
     };
-    const blue = lines(mesh.blue, palette.landscape, l.blueOpacity);
-    const gold = lines(mesh.gold, palette.gold, l.goldOpacity);
+    const blue = lines(mesh.blue, mesh.blueFade, palette.landscape, l.blueOpacity);
+    const gold = lines(mesh.gold, mesh.goldFade, palette.gold, l.goldOpacity);
     // Phase 9: gold shimmer — opacity between from and to on TSL time (no per-frame JS work);
     // the plan's "if a shimmer is wanted, animate the gold opacity between 0.6 and 0.9 slowly"
     const { goldShimmer } = motion;
     if (sceneMotionEnabled() && goldShimmer.period > 0) {
       const mid = (goldShimmer.from + goldShimmer.to) / 2;
       const half = (goldShimmer.to - goldShimmer.from) / 2;
-      gold.material.opacityNode = float(mid).add(
-        sin(time.mul((Math.PI * 2) / goldShimmer.period)).mul(half),
-      );
+      gold.material.opacityNode = float(mid)
+        .add(sin(time.mul((Math.PI * 2) / goldShimmer.period)).mul(half))
+        .mul(fadeAttr);
     }
     const points = createPointSprites({
       points: mesh.points,
       size: spriteSizeForPointSize(l.pointSize, currentVerticalFov()),
       color: palette.landscape,
       opacity: l.pointOpacity,
+      opacities: mesh.pointFade,
     });
 
     return {

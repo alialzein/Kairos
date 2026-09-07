@@ -37,6 +37,8 @@ export interface PointSpritesOptions {
   /** per-sprite multipliers hashed by instance index: [min, max] */
   sizeJitter?: [number, number];
   opacityJitter?: [number, number];
+  /** per-point opacity multiplier (one float per point), e.g. the landscape's bottom fade */
+  opacities?: Float32Array;
   depthTest?: boolean;
   blending?: Blending;
   renderOrder?: number;
@@ -62,7 +64,8 @@ export function createPointSprites(o: PointSpritesOptions): PointSprites {
   // shapeCircle is typed as a bare Node in @types/three 0.185.4 (same gap as avatar/lines/Sparks.ts)
   material.opacityNode = float(shapeCircle() as unknown as Parameters<typeof float>[0])
     .mul(o.opacity)
-    .mul(jitter(o.opacityJitter));
+    .mul(jitter(o.opacityJitter))
+    .mul(o.opacities ? instancedArray(o.opacities, "float").element(instanceIndex) : float(1));
   material.transparent = true;
   material.depthTest = o.depthTest ?? true;
   material.depthWrite = false;

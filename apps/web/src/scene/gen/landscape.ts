@@ -6,11 +6,16 @@ export type Noise2D = (x: number, y: number) => number;
 export interface LandscapeMesh {
   /** grid vertices, xyz, both sides */
   points: Float32Array;
+  /** per point: bottom fade 0..1 (smoothstep(fade[0], fade[1], y)) */
+  pointFade: Float32Array;
   /** kept edges as segment pairs [ax ay az bx by bz, ...], minus the gold ones */
   blue: Float32Array;
+  /** per blue segment endpoint: bottom fade, [fa fb, ...] */
+  blueFade: Float32Array;
   /** `goldRatio` of the kept edges drawn at random with probability ∝ (normalized height)²,
    *  same layout — gold scatters across the peaks on both sides (Ali, round 2 item 2) */
   gold: Float32Array;
+  goldFade: Float32Array;
   pointCount: number;
   blueCount: number;
   goldCount: number;
@@ -22,23 +27,29 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
 };
 
 /**
- * Wireframe mountain networks flanking the bust (docs/plans/scene-plan.md Phase 7). Per side a
- * `cols + 1` × `rows` grid (x from xStart to xEnd inclusive, z stepping back by zStep) whose
- * height is a two-octave ridge (`ridge`) from the seeded noise, clamped ≥ 0, scaled by amplitude
- * and a falloff that keeps it off the bust (smoothstep(falloff[0], falloff[1], |x|)), sinking
- * `rowSink` per row. Edges
- * connect (i,j)→(i+1,j), (i,j)→(i,j+1), (i,j)→(i+1,j+1) with `dropout` of them removed by the
- * seeded rng so the mesh reads organic, not as a grid; `goldRatio` of the kept edges are drawn
- * (without replacement, same rng) with probability ∝ (normalized mean height)², so gold
- * scatters over every peak instead of the single tallest ridge (Ali, round 2 item 2 — replaces
- * the plan's "top 10 % by y"). Deterministic for a given noise + rng.
+ * Terrain heightfields flanking the bust (docs/plans/scene-plan.md Phase 7, rebuilt as a real
+ * heightfield in Ali's round 3). Per side a `cols + 1` × `rows` grid (x from xStart to xEnd
+ * inclusive, z from zStart stepping back by zStep). Height is two octaves of the seeded noise
+ * sampled continuously over world (x, z) — never per row index — so ridges are broad and
+ * coherent:
+ *   h = noise2D(x·lowScale, z·lowScale)·lowWeight + noise2D(x·highScale, z·highScale)·highWeight
+ *   y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·smoothstep(falloff[0], falloff[1], |x|)
+ * so the far rows are the peaks and the near rows drop below the frame, and the |x| falloff keeps
+ * the terrain off the bust. Every vertex carries a bottom fade smoothstep(fade[0], fade[1], y) so
+ * the surface fades out at the bottom instead of ending on a line. Edges connect
+ * (i,j)→(i+1,j), (i,j)→(i,j+1), (i,j)→(i+1,j+1) with `dropout` of them removed by the seeded rng;
+ * `goldRatio` of the kept edges are drawn (without replacement, same rng) with probability
+ * ∝ (normalized mean height)², so gold scatters over every peak (Ali, round 2). Deterministic
+ * for a given noise + rng.
  */
 export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rng): LandscapeMesh {
   const cols = l.cols + 1;
   const rows = l.rows;
   const perSide = cols * rows;
   const points = new Float32Array(2 * perSide * 3);
+  const pointFade = new Float32Array(2 * perSide);
   const index = (side: number, i: number, j: number) => side * perSide + i * rows + j;
+  const fadeOf = (y: number) => smoothstep(l.fade[0], l.fade[1], y);
   for (let side = 0; side < 2; side++) {
     const sign = side === 0 ? -1 : 1;
     for (let i = 0; i < cols; i++) {
@@ -46,15 +57,16 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
       for (let j = 0; j < rows; j++) {
         const z = l.zStart + j * l.zStep;
         const { ridge: r } = l;
-        const ridge =
-          noise2D(x * r.lowScale, j * r.rowScale) * r.lowWeight +
-          noise2D(x * r.highScale, j * r.rowScale) * r.highWeight;
+        const h =
+          noise2D(x * r.lowScale, z * r.lowScale) * r.lowWeight +
+          noise2D(x * r.highScale, z * r.highScale) * r.highWeight;
         const falloff = smoothstep(l.falloff[0], l.falloff[1], Math.abs(x));
-        const y = l.baseY + Math.max(ridge, 0) * l.amplitude * falloff - j * l.rowSink;
-        const k = index(side, i, j) * 3;
-        points[k] = x;
-        points[k + 1] = y;
-        points[k + 2] = z;
+        const y = l.baseY + (l.zStart - z) * l.slope + Math.max(h, 0) * l.amplitude * falloff;
+        const p = index(side, i, j);
+        points[p * 3] = x;
+        points[p * 3 + 1] = y;
+        points[p * 3 + 2] = z;
+        pointFade[p] = fadeOf(y);
       }
     }
   }
@@ -94,32 +106,42 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
         break;
       }
     }
-    if (pick < 0)
-      for (let k = kept.length - 1; k >= 0; k--)
+    if (pick < 0) {
+      for (let k = kept.length - 1; k >= 0; k--) {
         if (!isGold[k] && (weight[k] ?? 0) > 0) {
           pick = k;
           break;
         }
+      }
+    }
     if (pick < 0) break;
     isGold[pick] = 1;
     remaining -= weight[pick] ?? 0;
   }
   const blue = new Float32Array((kept.length - goldCount) * 6);
+  const blueFade = new Float32Array((kept.length - goldCount) * 2);
   const gold = new Float32Array(goldCount * 6);
+  const goldFade = new Float32Array(goldCount * 2);
   let b = 0;
   let g = 0;
   kept.forEach((e, k) => {
     const target = isGold[k] ? gold : blue;
+    const fade = isGold[k] ? goldFade : blueFade;
     const at = isGold[k] ? g++ : b++;
     for (let c = 0; c < 3; c++) {
       target[at * 6 + c] = points[e[0] * 3 + c] ?? 0;
       target[at * 6 + 3 + c] = points[e[1] * 3 + c] ?? 0;
     }
+    fade[at * 2] = pointFade[e[0]] ?? 0;
+    fade[at * 2 + 1] = pointFade[e[1]] ?? 0;
   });
   return {
     points,
+    pointFade,
     blue,
+    blueFade,
     gold,
+    goldFade,
     pointCount: 2 * perSide,
     blueCount: kept.length - goldCount,
     goldCount,

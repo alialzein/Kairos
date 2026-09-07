@@ -227,6 +227,25 @@ later, not blocking; the CI WebGL2 re-baseline is a separate PR after #29; B5 cl
 Track A wait. Process: Phase 9 shipped ahead of Phase 8's approval — kept, but every next phase
 now waits for approval.
 
+## Feedback round 3 (Ali, 2026-09-07) — Phase 7 rebuilt as a heightfield
+
+Screenshots: `docs/screens/feedback-3/phase-7-16x9.png`, `phase-7-half.png`.
+
+- Grid per side 36 × 14 (zStart −0.5, zStep −0.35). Height is two octaves of the seeded noise
+  sampled continuously over world (x, z), never per row index:
+  h = noise2D(x·0.35, z·0.35)·0.7 + noise2D(x·0.9, z·0.9)·0.25.
+- y = baseY + (zStart − z)·slope + max(h, 0)·amplitude·falloff(|x|) with baseY −1.2, slope 0.2,
+  amplitude 1.4: the far rows are the peaks (about neck height), the near rows drop below the
+  frame. Dropout 0.55, the height² gold sampling and the |x| falloff are unchanged.
+- Bottom fade: every vertex carries smoothstep(fade[0], fade[1], y) (config `fade`
+  [−1.2, −0.4]) multiplied into the line and point opacities, so the surface fades out at the
+  bottom instead of ending on a line (a `fade` attribute on the lines, a per-point opacity on
+  the sprites). 5 generator tests incl. "a vertex's height does not depend on the row count".
+- Bust `skirtTo` −1.6 → −3.0 (the bottom edge never shows at any aspect); face core `radius`
+  0.35 → 0.42 (the optional single value).
+- Check at 16:9 and half width: no vertical spikes, no flat bottom line, peaks around neck
+  height, terrain sloping toward the viewer on both sides.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
