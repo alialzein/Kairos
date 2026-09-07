@@ -143,9 +143,12 @@ describe("landscape (Phase 11.1: a dense plexus network)", () => {
     // nothing above fade[1] is dimmed at all — there is no other fade
     for (let i = 0; i < m.nodeCount; i++)
       if ((all[i]?.[1] ?? 0) >= small.fade[1]) expect(m.nodeFade[i]).toBe(1);
-    // and the surface does reach down through the fade band, so each side is filled to the
-    // bottom edge of the frame rather than stopping above it
-    expect(Math.min(...all.map(([, y]) => y))).toBeLessThan(small.fade[0]);
+    // and the surface starts inside the fade band (baseY sits at the frame's bottom edge), so
+    // each side fills from the bottom up: the lowest node is partially faded, not cut off
+    const minY = Math.min(...all.map(([, y]) => y));
+    expect(minY).toBeLessThan(small.fade[1]);
+    // (z jitter ahead of zStart lowers a node by at most jitter·slope)
+    expect(minY).toBeGreaterThanOrEqual(small.baseY - small.jitter * small.slope - 1e-6);
   });
 
   it("joins each node to its k ∈ neighbors nearest same-side neighbours, never farther than maxEdge", () => {
@@ -321,13 +324,18 @@ describe("landscape (Phase 11.1: a dense plexus network)", () => {
     }
     const edgeTotal = full.blueCount + full.goldCount;
     const isolated = Array.from(degree).filter((d) => d === 0).length;
-    // coverage: the surface spans the whole fade band — a good share of it is at full opacity
-    // above fade[1], and it still runs off the bottom of the frame below fade[0]
+    // coverage: a good share of the surface is at full opacity above fade[1], and the near rows
+    // sit inside the fade band (baseY −0.7 is at the frame's bottom edge), so nothing is wasted
+    // below fade[0] and the slope fades in from the bottom
     const lit = ys.filter((y) => y >= cfg.fade[1]).length / ys.length;
+    const fading = ys.filter((y) => y > cfg.fade[0] && y < cfg.fade[1]).length / ys.length;
     const dark = ys.filter((y) => y <= cfg.fade[0]).length / ys.length;
-    console.log(`[landscape 11.1] lit ${lit.toFixed(3)} · below the frame ${dark.toFixed(3)}`);
+    console.log(
+      `[landscape 11.1] lit ${lit.toFixed(3)} · fading ${fading.toFixed(3)} · dark ${dark.toFixed(3)}`,
+    );
     expect(lit).toBeGreaterThan(0.25);
-    expect(dark).toBeGreaterThan(0.05);
+    expect(fading).toBeGreaterThan(0.05);
+    expect(dark).toBe(0);
     console.log(
       `[landscape 11.1] ${ms.toFixed(0)} ms · nodes ${fullTotal} (blue ${full.nodeCount}, gold ` +
         `${full.goldNodeCount}) · edges ${edgeTotal} (blue ${full.blueCount}, gold ` +
