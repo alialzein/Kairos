@@ -19,6 +19,7 @@ export const LAYER_NAMES = [
   "core",
   "neck",
   "rings",
+  "dust",
   "landscape",
   "post",
   "hud",
@@ -251,19 +252,46 @@ export interface SceneConfig {
       opacity: number;
       seed: number;
     };
-    /** Phase 10.4 (Ali): faint dust drifting around the head — `count` points in a disc of
-     *  `radius` in x/y around `bust.headCenter`, z uniform in `depth` relative to its z. Each
-     *  point drifts by up to `amount` world units on a per-point-hashed sine of TSL time with
-     *  period `period` seconds; still under reduced motion. (drei `<Sparkles>` has no WebGPU
-     *  equivalent in this repo, so it is the shared Phase 10 sprite with a drift offset.) */
-    drift: {
+  };
+  /** Phase 11.4 (Ali): ambient particle life everywhere, strongest above the head. Two
+   *  sub-layers, one object each, both animated entirely on TSL `time` (no per-frame JS) and
+   *  both still under reduced motion. Replaces the Phase 10.4 `rings.drift` disc. */
+  dust: {
+    /** Phase 11.4 (Ali): the global dust volume — `count` points uniform in an axis-aligned box
+     *  of full extent `size` (6 × 4 × 3) centred on `center`, drawn as the shared Phase 10 soft
+     *  sprite at `pointSize` (PointsMaterial units × `particles.sizeScale`) and `opacity`, with
+     *  per-point size/opacity multipliers from `sizeJitter` / `opacityJitter`. Each point
+     *  wanders up to `drift.amount` world units on a per-point-hashed sine of TSL time with
+     *  period `drift.period` seconds; `seed` places the points. depthTest stays on so the bust
+     *  occludes the points behind it. */
+    ambient: {
+      center: Vec3;
+      size: Vec3;
       count: number;
-      radius: number;
-      size: number;
+      pointSize: number;
       opacity: number;
-      depth: [number, number];
-      amount: number;
+      sizeJitter: [number, number];
+      opacityJitter: [number, number];
+      drift: { amount: number; period: number };
+      seed: number;
+    };
+    /** Phase 11.4 (Ali): the crown plume — the particle spray above the head. `count` points in
+     *  a cone rooted at `crown`, rising `height` world units while its radius goes `baseRadius`
+     *  → `topRadius`. Each particle rises over `period / speed` seconds (its speed drawn from
+     *  `speedJitter`), wraps back to the base, and sways `wobble` world units sideways; alpha
+     *  fades in over the first 8 % of the rise (so respawn never pops) and out to nothing at the
+     *  tip. `seed` draws the lanes, phases and speeds. */
+    plume: {
+      crown: Vec3;
+      baseRadius: number;
+      topRadius: number;
+      height: number;
       period: number;
+      speedJitter: [number, number];
+      wobble: number;
+      count: number;
+      pointSize: number;
+      opacity: number;
       seed: number;
     };
   };
@@ -382,6 +410,7 @@ export const sceneConfig: SceneConfig = {
     core: true,
     neck: true,
     rings: true,
+    dust: true,
     landscape: true,
     post: true,
     hud: true,
@@ -531,8 +560,8 @@ export const sceneConfig: SceneConfig = {
   },
 
   // Ali round 1 Phase 6: 9 rings, outer radius 0.9 + 8·0.25 = 2.9 (≤ 2.9), opacity 0.4 → 0.03
-  // Phase 10.4 (Ali): the annuli drop to ×0.6 and carry 250 beads each; 400 drifting dust
-  // points fill a 3.5-unit disc around the head
+  // Phase 10.4 (Ali): the annuli drop to ×0.6 and carry 250 beads each (Phase 11.4 moved the
+  // drifting dust out to its own `dust` layer)
   rings: {
     center: [0, 1.45, -1.3],
     count: 9,
@@ -544,15 +573,36 @@ export const sceneConfig: SceneConfig = {
     segments: 160,
     geometryOpacity: 0.6,
     points: { perRing: 250, radialJitter: 0.03, size: 0.02, opacity: 1, seed: 17 },
-    drift: {
-      count: 400,
-      radius: 3.5,
-      size: 0.03,
-      opacity: 0.25,
-      depth: [-1.3, 0.2],
-      amount: 0.06,
-      period: 8,
+  },
+
+  // Phase 11.4 (Ali): the density pass on the air itself — 2,500 dust points in a 6 × 4 × 3
+  // box around the bust (the Phase 10.4 400-point disc on `rings.drift` was too sparse to read
+  // as atmosphere), plus a 1,500-point plume spraying out of the crown. The crown y is the
+  // canonical head top 0.9 × `bust.glb.scale` 1.6 + `bust.glb.offset` y 0.65 = 2.09.
+  dust: {
+    ambient: {
+      center: [0, 0.8, -0.4],
+      size: [6, 4, 3],
+      count: 2500,
+      pointSize: 0.01,
+      opacity: 0.35,
+      sizeJitter: [0.6, 1.4],
+      opacityJitter: [0.5, 1],
+      drift: { amount: 0.08, period: 12 },
       seed: 19,
+    },
+    plume: {
+      crown: [0, 2.09, 0],
+      baseRadius: 0.25,
+      topRadius: 0.1,
+      height: 1.2,
+      period: 6,
+      speedJitter: [0.7, 1.3],
+      wobble: 0.04,
+      count: 1500,
+      pointSize: 0.015,
+      opacity: 0.6,
+      seed: 23,
     },
   },
 

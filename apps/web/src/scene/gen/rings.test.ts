@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "@/avatar/sim/random";
 import { sceneConfig } from "../sceneConfig";
-import { driftPoints, ringPoints, ringSpecs } from "./rings";
+import { ringPoints, ringSpecs } from "./rings";
 
 describe("ringSpecs", () => {
   it("steps outward from innerRadius and fades from opacityFrom to opacityTo", () => {
@@ -62,33 +62,5 @@ describe("ringPoints", () => {
   });
   it("emits nothing for zero points", () => {
     expect(ringPoints(spec, { ...o, perRing: 0 }, mulberry32(17)).length).toBe(0);
-  });
-});
-
-describe("driftPoints", () => {
-  const o = { count: 400, radius: 3.5, depth: [-1.3, 0.2] as [number, number] };
-  const p = driftPoints(o, mulberry32(19));
-
-  it("emits count points inside the disc, centred on the origin", () => {
-    expect(p.length).toBe(o.count * 3);
-    let max = 0;
-    for (let i = 0; i < o.count; i++) {
-      const r = Math.hypot(p[i * 3] ?? 0, p[i * 3 + 1] ?? 0);
-      expect(r).toBeLessThanOrEqual(o.radius + 1e-9);
-      max = Math.max(max, r);
-    }
-    expect(max).toBeGreaterThan(o.radius * 0.9); // uniform over the disc, not bunched at the centre
-  });
-  it("puts z uniformly in depth", () => {
-    for (let i = 0; i < o.count; i++) {
-      const z = p[i * 3 + 2] ?? 0;
-      expect(z).toBeGreaterThanOrEqual(o.depth[0]);
-      expect(z).toBeLessThanOrEqual(o.depth[1]);
-    }
-  });
-  it("is deterministic per seed", () => {
-    expect(Array.from(driftPoints(o, mulberry32(8)))).toEqual(
-      Array.from(driftPoints(o, mulberry32(8))),
-    );
   });
 });

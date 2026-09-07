@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Color, DoubleSide, Group, Mesh, MeshBasicNodeMaterial, RingGeometry } from "three/webgpu";
 import { mulberry32 } from "@/avatar/sim/random";
 import { currentVerticalFov } from "./framing";
-import { driftPoints, ringPoints, ringSpecs } from "./gen/rings";
+import { ringPoints, ringSpecs } from "./gen/rings";
 import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { createPointSprites, spriteSizeForPointSize, type PointSprites } from "./tsl";
@@ -20,16 +20,15 @@ import { createPointSprites, spriteSizeForPointSize, type PointSprites } from ".
  * `rings.geometryOpacity` of its opacity and carries `rings.points.perRing` soft sprites
  * scattered along its circle (±`radialJitter` radially), added as a CHILD of the ring mesh so the
  * Phase 9 breathing scale carries the beads too; bead opacity fades with the ring (the innermost
- * ring's beads sit at the full `points.opacity`). Plus one drifting dust layer around the head —
- * `rings.drift.count` faint sprites in a disc, each wandering on TSL time (drei `<Sparkles>` has
- * no WebGPU equivalent here, so it is the shared Phase 10 sprite with the `drift` offset). The
- * dust keeps depthTest on so the bust occludes the points behind it; it holds still under
- * reduced motion.
+ * ring's beads sit at the full `points.opacity`).
+ *
+ * Phase 11.4 (Ali) — the drifting dust that used to live here (`rings.drift`) moved out to its
+ * own `dust` layer (Dust.tsx), which covers the whole scene instead of a disc around the head.
  */
 export function Rings() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { rings, bust, palette, particles } = sceneConfig;
+    const { rings, palette, particles } = sceneConfig;
     const fov = currentVerticalFov();
     const group = new Group();
     group.position.set(...rings.center);
@@ -71,23 +70,8 @@ export function Rings() {
       group.add(mesh);
     }
 
-    const drift = createPointSprites({
-      points: driftPoints(rings.drift, mulberry32(rings.drift.seed)),
-      size: spriteSizeForPointSize(rings.drift.size * particles.sizeScale, fov),
-      color: palette.line,
-      opacity: rings.drift.opacity,
-      sizeJitter: [0.6, 1.4],
-      opacityJitter: [0.5, 1],
-      depthTest: true,
-      ...(sceneMotionEnabled()
-        ? { drift: { amount: rings.drift.amount, period: rings.drift.period } }
-        : {}),
-    });
-    drift.sprite.position.set(...bust.headCenter);
-    sprites.push(drift);
-
     return {
-      objects: [group, drift.sprite] as const,
+      objects: [group] as const,
       meshes,
       dispose() {
         for (const mesh of meshes) {

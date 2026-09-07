@@ -6,6 +6,7 @@ import type { WebGPURenderer } from "three/webgpu";
 import { FrameStats } from "@/avatar/telemetry/frametime";
 import { Background } from "./Background";
 import { Bust } from "./Bust";
+import { Dust } from "./Dust";
 import { Effects } from "./Effects";
 import { FaceCore } from "./FaceCore";
 import { Hud } from "./Hud";
@@ -221,6 +222,7 @@ export function SceneCanvas({
         {layers.core ? <FaceCore /> : null}
         {layers.neck ? <NeckCircuit /> : null}
         {layers.rings ? <Rings /> : null}
+        {layers.dust ? <Dust /> : null}
         {layers.landscape ? <Landscape /> : null}
         {layers.post ? <Effects /> : null}
         <FrameTicker waitForBust={layers.bust} onReady={onReady} />

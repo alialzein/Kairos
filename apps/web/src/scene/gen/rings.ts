@@ -44,25 +44,3 @@ export function ringPoints(
   }
   return out;
 }
-
-/**
- * Phase 10.4 (Ali) — the faint drifting dust around the head: `count` points uniform in a disc of
- * `radius` in x/y (r = radius·√u, so the disc fills evenly rather than bunching at the centre)
- * with z uniform in `depth`. Centred on the origin; the layer offsets it to `bust.headCenter`.
- */
-export function driftPoints(
-  o: { count: number; radius: number; depth: [number, number] },
-  rng: Rng,
-): Float32Array {
-  const n = Math.max(0, Math.floor(o.count));
-  const out = new Float32Array(n * 3);
-  const [z0, z1] = o.depth;
-  for (let i = 0; i < n; i++) {
-    const a = rng() * Math.PI * 2;
-    const r = Math.sqrt(rng()) * o.radius;
-    out[i * 3] = Math.cos(a) * r;
-    out[i * 3 + 1] = Math.sin(a) * r;
-    out[i * 3 + 2] = z0 + rng() * (z1 - z0);
-  }
-  return out;
-}

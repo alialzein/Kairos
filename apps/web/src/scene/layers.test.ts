@@ -13,7 +13,8 @@ describe("layersFromQuery", () => {
       Object.fromEntries(LAYER_NAMES.map((n) => [n, false])),
     );
     expect(layersFromQuery({ phase: "8" }).shell).toBe(false); // Phase 10
-    expect(layersFromQuery({ phase: "10" })).toEqual(
+    expect(layersFromQuery({ phase: "10" }).dust).toBe(false); // Phase 11.4
+    expect(layersFromQuery({ phase: "11" })).toEqual(
       Object.fromEntries(LAYER_NAMES.map((n) => [n, true])),
     );
   });
