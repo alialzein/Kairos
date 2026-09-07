@@ -16,6 +16,7 @@ export const LAYER_NAMES = [
   "bust",
   "contours",
   "shell",
+  "halo",
   "core",
   "neck",
   "rings",
@@ -128,6 +129,12 @@ export interface SceneConfig {
       opacity: number;
       seed: number;
     };
+    /** Phase 12.3 (Ali): rim glow — the bust duplicated at `scale` (about the geometry's bounding
+     *  box centre, so the copy grows evenly instead of drifting up off the origin), back faces
+     *  only, additive and depth-write free, drawn in `color` with
+     *  alpha = pow(1 − |n·v|, `fresnelPower`) · `alpha`. Only the silhouette survives that curve,
+     *  so the outline is the brightest thing in the frame with a soft halo around it. */
+    halo: { scale: number; color: string; alpha: number; fresnelPower: number };
     headCenter: Vec3;
     headRadius: number;
     headScaleY: number;
@@ -432,6 +439,7 @@ export const sceneConfig: SceneConfig = {
     bust: true,
     contours: true,
     shell: true,
+    halo: true,
     core: true,
     neck: true,
     rings: true,
@@ -503,15 +511,19 @@ export const sceneConfig: SceneConfig = {
     // alpha curve drops on both ends (0.15 + 0.85·fresnel → 0.03 + 0.6·fresnel) so the front face
     // stays readable and the rim glows without the individual sprites showing. No pulse: the
     // shell tint is static (Ali).
+    // Phase 12.3 (Ali): the shell backs the halo up — 80k → 120k points and the rim alpha
+    // 0.6 → 0.9, so the mist at the silhouette is as dense and bright as the glow it sits under.
+    // The base alpha stays 0.03: the front face must not fill in.
     shell: {
-      count: 80000,
+      count: 120000,
       push: [0.01, 0.04],
       size: [0.005, 0.0125],
       alphaMin: 0.03,
-      alphaRim: 0.6,
+      alphaRim: 0.9,
       opacity: 1,
       seed: 13,
     },
+    halo: { scale: 1.015, color: "#9BE9FF", alpha: 0.9, fresnelPower: 2 },
     headCenter: [0, 1.45, 0],
     headRadius: 0.5,
     headScaleY: 1.2,

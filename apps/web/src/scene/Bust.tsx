@@ -3,6 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type BufferGeometry, Color, FrontSide, Mesh, MeshBasicNodeMaterial } from "three/webgpu";
 import { loadBust } from "@/avatar/sim/bust";
+import { createBustHalo } from "./BustHalo";
 import { createBustShell } from "./BustShell";
 import { createContourMaterial } from "./ContourMaterial";
 import { meshBust, primitiveBust } from "./gen/bustGeometry";
@@ -16,11 +17,21 @@ import { useSceneStore } from "./store";
  * Phase 2 material: flat `palette.fill` so only the silhouette shows. `contours` (Phase 3)
  * swaps in the contour-line material; false keeps this flat fill for comparison.
  * `shell` (Phase 10.2) adds the particle shell sampled over the same geometry (BustShell.ts)
- * on top of the mesh, which is unchanged either way.
+ * on top of the mesh, which is unchanged either way. `halo` (Phase 12.3) adds the back-face rim
+ * glow over the same geometry again (BustHalo.ts) — also its own object, so either toggle is
+ * independent of the mesh.
  * Reports `bustReady` to the store once the mesh is in the scene (the canvas's `ready` waits
  * for it) and `error` if the mesh fails to load.
  */
-export function Bust({ contours, shell }: { contours: boolean; shell: boolean }) {
+export function Bust({
+  contours,
+  shell,
+  halo,
+}: {
+  contours: boolean;
+  shell: boolean;
+  halo: boolean;
+}) {
   const scene = useThree((s) => s.scene);
   const [geometry, setGeometry] = useState<BufferGeometry | null>(() =>
     sceneConfig.bust.source === "primitives" ? primitiveBust(sceneConfig.bust) : null,
@@ -91,5 +102,17 @@ export function Bust({ contours, shell }: { contours: boolean; shell: boolean })
       built.dispose();
     };
   }, [scene, geometry, shell]);
+
+  // Phase 12.3 — the silhouette halo, the same geometry drawn back-face-only just outside the
+  // mesh (BustHalo.ts); its own object for the same reason as the shell
+  useEffect(() => {
+    if (!geometry || !halo) return;
+    const built = createBustHalo(geometry, sceneConfig);
+    scene.add(built.mesh);
+    return () => {
+      scene.remove(built.mesh);
+      built.dispose();
+    };
+  }, [scene, geometry, halo]);
   return null;
 }

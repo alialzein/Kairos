@@ -14,7 +14,8 @@ describe("layersFromQuery", () => {
     );
     expect(layersFromQuery({ phase: "8" }).shell).toBe(false); // Phase 10
     expect(layersFromQuery({ phase: "10" }).dust).toBe(false); // Phase 11.4
-    expect(layersFromQuery({ phase: "11" })).toEqual(
+    expect(layersFromQuery({ phase: "11" }).halo).toBe(false); // Phase 12.3
+    expect(layersFromQuery({ phase: "12" })).toEqual(
       Object.fromEntries(LAYER_NAMES.map((n) => [n, true])),
     );
   });
