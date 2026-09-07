@@ -3,6 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { mulberry32 } from "@/avatar/sim/random";
 import { starPositions } from "./gen/stars";
+import { currentVerticalFov } from "./framing";
 import { sceneConfig } from "./sceneConfig";
 import { createPointSprites } from "./tsl";
 
@@ -20,7 +21,7 @@ export function Stars() {
         count: stars.count,
         radius: stars.radius,
         depth: stars.depth,
-        fovDeg: camera.fov,
+        fovDeg: currentVerticalFov(),
         aspect: stars.aspect,
         camera: camera.position,
         margin: stars.margin,

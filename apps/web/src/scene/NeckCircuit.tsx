@@ -5,6 +5,7 @@ import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js
 import { LineSegments2 } from "three/addons/lines/webgpu/LineSegments2.js";
 import { Line2NodeMaterial } from "three/webgpu";
 import { mulberry32 } from "@/avatar/sim/random";
+import { currentVerticalFov } from "./framing";
 import { neckCircuit } from "./gen/neck";
 import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
@@ -20,7 +21,7 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
 export function NeckCircuit() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { neck, bust, palette, camera } = sceneConfig;
+    const { neck, bust, palette } = sceneConfig;
     const circuit = neckCircuit(
       {
         jawY: neck.jawY,
@@ -96,7 +97,7 @@ export function NeckCircuit() {
 
     const cluster = createPointSprites({
       points: circuit.nodePoints,
-      size: spriteSizeForPointSize(neck.node.pointSize, camera.fov),
+      size: spriteSizeForPointSize(neck.node.pointSize, currentVerticalFov()),
       color: palette.gold,
       opacity: 1,
       depthTest: false,

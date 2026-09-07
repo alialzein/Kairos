@@ -11,6 +11,7 @@ import {
 } from "three/webgpu";
 import { makeNoise } from "@/avatar/sim/noise";
 import { mulberry32 } from "@/avatar/sim/random";
+import { currentVerticalFov } from "./framing";
 import { landscape } from "./gen/landscape";
 import { landscapeCols, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
@@ -27,7 +28,7 @@ import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 export function Landscape() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { landscape: base, palette, camera, perf, motion } = sceneConfig;
+    const { landscape: base, palette, perf, motion } = sceneConfig;
     // Phase 9 perf: half the columns on mobile widths
     const cols =
       typeof window === "undefined" ? base.cols : landscapeCols(window.innerWidth, base.cols, perf);
@@ -64,7 +65,7 @@ export function Landscape() {
     }
     const points = createPointSprites({
       points: mesh.points,
-      size: spriteSizeForPointSize(l.pointSize, camera.fov),
+      size: spriteSizeForPointSize(l.pointSize, currentVerticalFov()),
       color: palette.landscape,
       opacity: l.pointOpacity,
     });

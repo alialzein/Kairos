@@ -13,6 +13,7 @@ import { Landscape } from "./Landscape";
 import { NeckCircuit } from "./NeckCircuit";
 import { Rings } from "./Rings";
 import { Stars } from "./Stars";
+import { currentVerticalFov, verticalFov } from "./framing";
 import { dprFor, sceneMotionEnabled } from "./motion";
 import { sceneConfig, type Layers } from "./sceneConfig";
 import { useSceneStore } from "./store";
@@ -32,6 +33,16 @@ export interface SceneCanvasProps {
  *  so the composition never moves; still under reduced motion. Uniform updates only. */
 function SceneCamera() {
   const camera = useThree((s) => s.camera);
+  // fixed horizontal fov (round 2 item 1): re-derive the vertical fov on every resize. The
+  // store's getter (not the hook's camera) keeps the lint's immutability rule happy.
+  const size = useThree((s) => s.size);
+  const get = useThree((s) => s.get);
+  useEffect(() => {
+    const cam = get().camera;
+    if (!("fov" in cam)) return;
+    cam.fov = verticalFov(sceneConfig.camera.hfov, size.width / Math.max(size.height, 1));
+    cam.updateProjectionMatrix();
+  }, [get, size]);
   const drift = useMemo(() => {
     const { cameraDrift } = sceneConfig.motion;
     return sceneMotionEnabled() && cameraDrift.x !== 0 && cameraDrift.period > 0
@@ -182,7 +193,8 @@ export function SceneCanvas({
     [forceWebGL],
   );
 
-  const { position, fov, near, far } = sceneConfig.camera;
+  const { position, near, far } = sceneConfig.camera;
+  const fov = currentVerticalFov(); // initial; SceneCamera keeps it in step with the aspect
   // Phase 9 perf: dpr ≤ perf.dprCap below perf.dprCapWidth px, ≤ perf.dprMax above (plan [1, 2])
   const dpr = useMemo(
     () =>

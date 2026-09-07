@@ -27,7 +27,9 @@ export type Layers = Record<LayerName, boolean>;
 
 export interface SceneConfig {
   layers: Layers;
-  camera: { position: Vec3; fov: number; lookAt: Vec3; near: number; far: number };
+  /** `hfov`: fixed horizontal field of view; the vertical fov is derived per aspect on every
+   *  resize (round 2 item 1). 54° = the plan's fov 32 at 16:9. */
+  camera: { position: Vec3; hfov: number; lookAt: Vec3; near: number; far: number };
   render: {
     /** 4× MSAA on the scene pass (the fat lines and the thin rings need it for smooth edges);
      *  off = 1 sample. `?set=render.antialias:false` on the bench */
@@ -283,7 +285,7 @@ export const sceneConfig: SceneConfig = {
   },
 
   // Ali round 1: z 5.5 → 6.0 to give the rings and head some air
-  camera: { position: [0, 1.0, 6.0], fov: 32, lookAt: [0, 1.05, 0], near: 0.1, far: 200 },
+  camera: { position: [0, 1.0, 6.0], hfov: 54, lookAt: [0, 1.05, 0], near: 0.1, far: 200 },
 
   render: { antialias: true },
 
