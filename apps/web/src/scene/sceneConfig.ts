@@ -96,6 +96,12 @@ export interface SceneConfig {
     /** fraction of one slice (0..0.5) */
     lineWidth: number;
     fresnelPower: number;
+    /** rim = edge · fresnel · this (plan shader literal 0.6; Ali round 1: 0.9) */
+    rimStrength: number;
+    /** lines are multiplied by 1 + this (plan shader literal 0.8, "push lines above the bloom
+     *  threshold"); it pushed #35C8FF past white into green-cyan, so Ali's "line must be exactly
+     *  #35C8FF" sets it to 0 — bloom now comes from the threshold alone */
+    lineBoost: number;
     scrollSpeed: number;
   };
   core: {
@@ -304,7 +310,15 @@ export const sceneConfig: SceneConfig = {
   // plan: frequency 90. At this camera 90 slices/unit are 0.7 px lines that bloom into a solid
   // cyan haze (docs/screens/phase-8-alt-plan-values.png); 45 matches the reference's ~45 lines
   // on the head and keeps dark fill between them (Phase 3/8 acceptance).
-  contours: { frequency: 45, lineWidth: 0.1, fresnelPower: 2.5, scrollSpeed: 0.05 },
+  // Ali round 1 Phase 3: lineWidth 0.10 → 0.05, rim 0.6 → 0.9, exact line colour (boost 0)
+  contours: {
+    frequency: 45,
+    lineWidth: 0.05,
+    fresnelPower: 2.5,
+    rimStrength: 0.9,
+    lineBoost: 0,
+    scrollSpeed: 0.05,
+  },
 
   // plan: [0, 1.5, 0.45] for the sphere head; the mesh's face (eyes y ≈ 1.35, mouth ≈ 1.08)
   // sits lower than a sphere's centre, so the glow is centred on it at y 1.3

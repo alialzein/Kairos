@@ -32,6 +32,8 @@ export function createContourUniforms(cfg: SceneConfig) {
     frequency: uniform(contours.frequency),
     lineWidth: uniform(contours.lineWidth),
     fresnelPower: uniform(contours.fresnelPower),
+    rimStrength: uniform(contours.rimStrength),
+    lineBoost: uniform(contours.lineBoost),
     scrollSpeed: uniform(contours.scrollSpeed),
     coreCenter: uniform(new Vector3(...core.center)),
     coreRadius: uniform(core.radius),
@@ -90,8 +92,8 @@ export function createContourMaterial(cfg: SceneConfig): ContourMaterial {
   const lineCol = vec3(mix(lineColor, coreColor, coreW));
   const fill = vec3(mix(vec3(u.fillColor), coreColor.mul(0.35), coreW.mul(0.7)));
   const col = vec3(mix(fill, lineCol, line))
-    .add(vec3(u.edgeColor).mul(fres).mul(0.6))
-    .mul(line.mul(0.8).add(1)); // push lines above the bloom threshold
+    .add(vec3(u.edgeColor).mul(fres).mul(float(u.rimStrength)))
+    .mul(line.mul(float(u.lineBoost)).add(1)); // plan: ×1.8 on lines (bloom); 0 = exact hex
 
   const material = new MeshBasicNodeMaterial();
   material.colorNode = col;
