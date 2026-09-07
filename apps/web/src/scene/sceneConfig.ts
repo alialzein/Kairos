@@ -333,17 +333,19 @@ export const sceneConfig: SceneConfig = {
   // plan: jawY 1.02 / controlY 0.75 / nodeY 0.42 for the sphere-head bust. On the mesh the chin
   // bottom is at y ≈ 0.89 and the sternum notch at ≈ 0.12, so the strands start under the jaw at
   // 0.95, converge at 0.15, and the control point keeps the plan's 45 % position between them.
+  // Ali round 1 Phase 5: strands start at the chin bottom (measured world y 0.70 → jawY 0.67),
+  // control point (x·0.6, midpoint y), sternum node doubled (points, spread, spokes, size)
   neck: {
-    jawY: 0.95,
+    jawY: 0.67,
     jawXs: [-0.22, -0.14, -0.06, 0.06, 0.14, 0.22],
     nodeY: 0.15,
-    controlY: 0.59,
+    controlY: 0.41,
     controlXFactor: 0.6,
     lineWidth: 1.5,
     opacity: 0.9,
     lift: 0.02,
     points: 40,
-    node: { points: 10, spread: 0.03, spokes: 6, spokeLength: 0.05, pointSize: 0.02 },
+    node: { points: 20, spread: 0.06, spokes: 6, spokeLength: 0.1, pointSize: 0.04 },
     seed: 5,
   },
 
