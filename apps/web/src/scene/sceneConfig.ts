@@ -149,6 +149,11 @@ export interface SceneConfig {
      *  #35C8FF" sets it to 0 — bloom now comes from the threshold alone */
     lineBoost: number;
     scrollSpeed: number;
+    /** Phase 10.3 (Ali): beaded contour lines — each line is modulated along world x by
+     *  `0.5 + 0.5·sin(x·frequency + floor(slice)·1.7)`, remapped through
+     *  `mix(min, 1, smoothstep(0.2, 0.8, bead))`, so the lines read as strings of dots up close
+     *  and stay continuous from a distance. `?set=contours.beads.enabled:false` for the off shot */
+    beads: { enabled: boolean; frequency: number; min: number };
   };
   core: {
     center: Vec3;
@@ -400,6 +405,7 @@ export const sceneConfig: SceneConfig = {
     rimStrength: 0.9,
     lineBoost: 0,
     scrollSpeed: 0.05,
+    beads: { enabled: true, frequency: 140, min: 0.35 },
   },
 
   // plan: [0, 1.5, 0.45] for the sphere head; the mesh's face (eyes y ≈ 1.35, mouth ≈ 1.08)
