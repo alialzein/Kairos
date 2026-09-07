@@ -15,15 +15,19 @@ test("scene bench page boots on WebGPU or WebGL and keeps rendering", async ({ p
   const first = await page.evaluate(() => window.__twinScene);
   expect(["webgpu", "webgl"]).toContain(first?.backend);
   expect(first?.error ?? null).toBeNull();
-  await page.waitForTimeout(2000);
-  const later = await page.evaluate(() => window.__twinScene);
-  expect((later?.frames ?? 0) - (first?.frames ?? 0)).toBeGreaterThan(10);
+  // keeps rendering: the page's own loop advances (progress, not a rate — software WebGL2 on
+  // the runner manages 1-10 fps)
+  await page.waitForFunction(
+    (f0) => (window.__twinScene?.frames ?? 0) > f0 + 10,
+    first?.frames ?? 0,
+    { timeout: 60_000 },
+  );
   // scene frames (the canvas publishes its frame-time window every 30 frames): CI only, because
   // local headless Chromium accumulates no frame stats on this PC (ledger, "PC session" — the
   // perf spec has the same limitation)
   if (process.env.CI)
     await page.waitForFunction(() => (window.__twinScene?.stats.count ?? 0) >= 30, null, {
-      timeout: 30_000,
+      timeout: 60_000,
     });
   expect(errors).toEqual([]);
   // HUD chrome (Phase 8) is plain DOM beside the canvas

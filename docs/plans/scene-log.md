@@ -154,7 +154,10 @@ too. No WebGPU frame has ever rendered on CI; WebGL2 renders there (ready in 4.5
 Applied: the smoke runs `?webgl=1` on CI (elsewhere the page picks its backend), MSAA became
 `sceneConfig.render.antialias` (`?set=render.antialias:false`), and a device lost by the browser
 is reported as the scene's `error` (our own dispose stays silent). Not applied, for Ali: the
-avatar's CI e2e and perf baseline measured the same dead device.
+avatar's CI e2e and perf baseline measured the same dead device. Follow-up: Playwright runs one
+worker on CI — SwiftShader is CPU-bound, and with two browsers the smoke fell to 3 fps while the
+perf spec's p95 (compared with a baseline) drifted 16 % over it; the smoke now waits for frame
+progress instead of asserting a rate after a fixed sleep.
 
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a

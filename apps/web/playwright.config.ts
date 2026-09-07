@@ -19,6 +19,9 @@ export default defineConfig({
   testDir: "tests",
   timeout: 90_000,
   retries: CI ? 1 : 0,
+  // one worker on the runner: SwiftShader is CPU-bound, so a second browser halves both the perf
+  // spec's frame rate (its p95 is compared with a baseline) and the scene smoke's
+  workers: CI ? 1 : undefined,
   reporter: CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: { baseURL: BASE, headless: true, trace: "retain-on-failure" },
   projects: [
