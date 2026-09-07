@@ -361,6 +361,8 @@ export const sceneConfig: SceneConfig = {
     segments: 160,
   },
 
+  // Ali round 1 Phase 7: amplitude 1.6 → 1.0, ridge lowScale 0.55 → 0.35 (broader peaks),
+  // dropout 0.35 → 0.55, points 0.025 → 0.04 at opacity 0.9
   landscape: {
     xStart: 1.2,
     xEnd: 4.0,
@@ -369,14 +371,14 @@ export const sceneConfig: SceneConfig = {
     zStart: -0.5,
     zStep: -0.4,
     baseY: -0.6,
-    amplitude: 1.6,
+    amplitude: 1.0,
     falloff: [1.2, 2.2],
     rowSink: 0.05,
-    ridge: { lowScale: 0.55, lowWeight: 0.7, highScale: 1.6, highWeight: 0.25, rowScale: 0.7 },
-    dropout: 0.35,
+    ridge: { lowScale: 0.35, lowWeight: 0.7, highScale: 1.6, highWeight: 0.25, rowScale: 0.7 },
+    dropout: 0.55,
     goldRatio: 0.1,
-    pointSize: 0.025,
-    pointOpacity: 0.8,
+    pointSize: 0.04,
+    pointOpacity: 0.9,
     blueOpacity: 0.35,
     goldOpacity: 0.8,
     noiseSeed: 7,
