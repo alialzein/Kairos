@@ -8,7 +8,8 @@ export interface LandscapeMesh {
   points: Float32Array;
   /** kept edges as segment pairs [ax ay az bx by bz, ...], minus the gold ones */
   blue: Float32Array;
-  /** the top `goldRatio` of kept edges by mean y (the ridge tops), same layout */
+  /** `goldRatio` of the kept edges drawn at random with probability ∝ (normalized height)²,
+   *  same layout — gold scatters across the peaks on both sides (Ali, round 2 item 2) */
   gold: Float32Array;
   pointCount: number;
   blueCount: number;
@@ -27,8 +28,10 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
  * and a falloff that keeps it off the bust (smoothstep(falloff[0], falloff[1], |x|)), sinking
  * `rowSink` per row. Edges
  * connect (i,j)→(i+1,j), (i,j)→(i,j+1), (i,j)→(i+1,j+1) with `dropout` of them removed by the
- * seeded rng so the mesh reads organic, not as a grid; the top `goldRatio` of the kept edges by
- * mean y go to the gold list. Deterministic for a given noise + rng.
+ * seeded rng so the mesh reads organic, not as a grid; `goldRatio` of the kept edges are drawn
+ * (without replacement, same rng) with probability ∝ (normalized mean height)², so gold
+ * scatters over every peak instead of the single tallest ridge (Ali, round 2 item 2 — replaces
+ * the plan's "top 10 % by y"). Deterministic for a given noise + rng.
  */
 export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rng): LandscapeMesh {
   const cols = l.cols + 1;
@@ -71,10 +74,36 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
   }
   const meanY = (e: [number, number]) =>
     ((points[e[0] * 3 + 1] ?? 0) + (points[e[1] * 3 + 1] ?? 0)) * 0.5;
-  const ranked = kept.map((e, k) => ({ e, k, y: meanY(e) })).sort((p, q) => q.y - p.y || p.k - q.k);
+  const heights = kept.map(meanY);
+  const minH = Math.min(...heights);
+  const maxH = Math.max(...heights);
+  const span = maxH - minH || 1;
+  const weight = heights.map((h) => ((h - minH) / span) ** 2);
   const goldCount = Math.round(kept.length * l.goldRatio);
   const isGold = new Uint8Array(kept.length);
-  for (let r = 0; r < goldCount; r++) isGold[ranked[r]?.k ?? 0] = 1;
+  // weighted sampling without replacement: each draw walks the remaining weight mass
+  let remaining = weight.reduce((a, w) => a + w, 0);
+  for (let r = 0; r < goldCount && remaining > 0; r++) {
+    let target = rng() * remaining;
+    let pick = -1;
+    for (let k = 0; k < kept.length; k++) {
+      if (isGold[k]) continue;
+      target -= weight[k] ?? 0;
+      if (target <= 0) {
+        pick = k;
+        break;
+      }
+    }
+    if (pick < 0)
+      for (let k = kept.length - 1; k >= 0; k--)
+        if (!isGold[k] && (weight[k] ?? 0) > 0) {
+          pick = k;
+          break;
+        }
+    if (pick < 0) break;
+    isGold[pick] = 1;
+    remaining -= weight[pick] ?? 0;
+  }
   const blue = new Float32Array((kept.length - goldCount) * 6);
   const gold = new Float32Array(goldCount * 6);
   let b = 0;

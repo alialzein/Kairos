@@ -29,7 +29,7 @@ describe("landscape", () => {
       expect(z).toBeLessThanOrEqual(cfg.zStart + 1e-9);
     }
   });
-  it("keeps roughly (1 − dropout) of the candidate edges and routes the top goldRatio to gold", () => {
+  it("keeps roughly (1 − dropout) of the candidate edges; gold is goldRatio of them, height-weighted and scattered", () => {
     const keptCount = m.blueCount + m.goldCount;
     expect(keptCount / full).toBeGreaterThan(1 - cfg.dropout - 0.06);
     expect(keptCount / full).toBeLessThan(1 - cfg.dropout + 0.06);
@@ -37,10 +37,22 @@ describe("landscape", () => {
     expect(m.blue.length).toBe(m.blueCount * 6);
     expect(m.gold.length).toBe(m.goldCount * 6);
     const meanY = (a: Float32Array, k: number) => ((a[k * 6 + 1] ?? 0) + (a[k * 6 + 4] ?? 0)) / 2;
-    let minGold = Infinity;
-    for (let k = 0; k < m.goldCount; k++) minGold = Math.min(minGold, meanY(m.gold, k));
-    for (let k = 0; k < m.blueCount; k++)
-      expect(meanY(m.blue, k)).toBeLessThanOrEqual(minGold + 1e-9);
+    const avg = (a: Float32Array, n: number) => {
+      let s = 0;
+      for (let k = 0; k < n; k++) s += meanY(a, k);
+      return s / n;
+    };
+    // probability ∝ height²: gold sits clearly higher than blue on average, but not only on top
+    expect(avg(m.gold, m.goldCount)).toBeGreaterThan(avg(m.blue, m.blueCount) + 0.2);
+    // ...and scatters: both sides, and many distinct columns per side (the old rule gave one spike)
+    const columns = { left: new Set<number>(), right: new Set<number>() };
+    for (let k = 0; k < m.goldCount; k++) {
+      const x = m.gold[k * 6] ?? 0;
+      const i = Math.round(((Math.abs(x) - cfg.xStart) / (cfg.xEnd - cfg.xStart)) * cfg.cols);
+      (x < 0 ? columns.left : columns.right).add(i);
+    }
+    expect(columns.left.size).toBeGreaterThan(8);
+    expect(columns.right.size).toBeGreaterThan(8);
   });
   it("rises with |x| (the falloff keeps the ridges off the bust) and is deterministic", () => {
     const x0 = cfg.falloff[0];

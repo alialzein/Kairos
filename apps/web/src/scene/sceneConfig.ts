@@ -408,8 +408,9 @@ export const sceneConfig: SceneConfig = {
     rows: 6,
     zStart: -0.5,
     zStep: -0.4,
-    baseY: -0.6,
-    amplitude: 1.0,
+    // round 2 item 2: ridges rise to about neck height on both sides
+    baseY: -0.2,
+    amplitude: 1.4,
     falloff: [1.2, 2.2],
     rowSink: 0.05,
     ridge: { lowScale: 0.35, lowWeight: 0.7, highScale: 1.6, highWeight: 0.25, rowScale: 0.7 },
