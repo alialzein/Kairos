@@ -36,8 +36,9 @@ function SceneCamera() {
   return null;
 }
 
-/** Marks the scene ready on its first frame and publishes p50/p95 frame times every 30 frames. */
-function FrameTicker({ onReady }: { onReady?: () => void }) {
+/** Marks the scene ready on its first frame with the bust in the scene (the mesh loads
+ *  asynchronously) and publishes p50/p95 frame times every 30 frames. */
+function FrameTicker({ waitForBust, onReady }: { waitForBust: boolean; onReady?: () => void }) {
   const stats = useRef(new FrameStats());
   const last = useRef(0);
   const frame = useRef(0);
@@ -46,7 +47,7 @@ function FrameTicker({ onReady }: { onReady?: () => void }) {
     const now = performance.now();
     if (last.current) stats.current.push(now - last.current);
     last.current = now;
-    if (!announced.current) {
+    if (!announced.current && (!waitForBust || useSceneStore.getState().bustReady)) {
       announced.current = true;
       useSceneStore.getState().setReady(true);
       onReady?.();
@@ -64,10 +65,43 @@ const gradient = `linear-gradient(180deg, ${sceneConfig.palette.bgTop} 0%, ${sce
 
 /** one renderer per canvas element, shared by any re-entrant factory call (see makeRenderer) */
 const inflight = new WeakMap<HTMLCanvasElement, Promise<WebGPURenderer>>();
+const pendingDispose = new WeakMap<object, ReturnType<typeof setTimeout>>();
+
+/**
+ * Disposes the WebGPU renderer when the Canvas unmounts: R3F's unmount only knows the WebGL
+ * renderer's API (renderLists / forceContextLoss), so three's common Renderer is never disposed
+ * by it. Deferred by a macrotask and cancelled on an immediate remount so React StrictMode's
+ * dev double-mount (cleanup → mount of the same renderer) does not dispose a live renderer.
+ */
+function RendererLifecycle() {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    const pending = pendingDispose.get(gl);
+    if (pending) {
+      clearTimeout(pending);
+      pendingDispose.delete(gl);
+    }
+    return () => {
+      pendingDispose.set(
+        gl,
+        setTimeout(() => {
+          pendingDispose.delete(gl);
+          inflight.delete(gl.domElement as HTMLCanvasElement);
+          (gl as unknown as WebGPURenderer).dispose();
+          useSceneStore.getState().reset();
+        }, 0),
+      );
+    };
+  }, [gl]);
+  return null;
+}
 
 /**
  * The "Neural Bust" scene (docs/plans/scene-plan.md): the plan's component tree inside one R3F
  * Canvas, each child gated by a layer flag, plus the DOM HUD beside it.
+ *
+ * Client-only: imports three/webgpu + addons at module level, so consumers must load it through
+ * `dynamic(() => import("@/scene/SceneCanvas"), { ssr: false })` (BenchScene does).
  *
  * Canvas-isolation rule (docs/plans/phase-b5-ledger.md, Task 7): with three 0.185.1's async WebGPU
  * init, a re-render of this component while the renderer initialises makes R3F run the `gl`
@@ -135,7 +169,8 @@ export function SceneCanvas({
         {layers.rings ? <Rings /> : null}
         {layers.landscape ? <Landscape /> : null}
         {layers.post ? <Effects /> : null}
-        <FrameTicker onReady={onReady} />
+        <FrameTicker waitForBust={layers.bust} onReady={onReady} />
+        <RendererLifecycle />
       </Canvas>
       {layers.hud ? <Hud /> : null}
     </div>

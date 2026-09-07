@@ -15,6 +15,8 @@ declare global {
     __twinScene?: {
       ready: boolean;
       backend: string | null;
+      /** asset load failure (bust mesh), null when fine */
+      error: string | null;
       frames: number;
       stats: { p50: number; p95: number; count: number };
       layers: Layers;
@@ -65,9 +67,14 @@ export function BenchScene({
 }) {
   // stable for the life of the page: the canvas parent must not re-render (ledger, Task 7)
   const layers = useMemo(() => layersFromQuery(query), [query]);
-  // sceneConfig is a module singleton; the bench page is reloaded for every change, so mutating it
-  // once before the canvas mounts is exactly the plan's "apply the named change, re-screenshot"
-  const applied = useMemo(() => applyOverrides(sceneConfig, set), [set]);
+  // sceneConfig is a module singleton; the bench page is reloaded for every change, so mutating
+  // the BROWSER's copy once before the canvas mounts is exactly the plan's "apply the named
+  // change, re-screenshot". Never on the server: this component is server-rendered too, and a
+  // mutation there would leak one request's `?set=` into every later request.
+  const applied = useMemo(
+    () => (typeof window === "undefined" ? [] : applyOverrides(sceneConfig, set)),
+    [set],
+  );
   const frames = useRef(0);
 
   useEffect(() => {
@@ -76,6 +83,7 @@ export function BenchScene({
       window.__twinScene = {
         ready: s.ready,
         backend: s.backend,
+        error: s.error,
         frames: frames.current,
         stats: s.stats,
         layers,
