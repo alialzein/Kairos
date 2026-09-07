@@ -1,4 +1,16 @@
-import { float, hash, instanceIndex, instancedArray, mix, uv, vec3, vec4 } from "three/tsl";
+import {
+  cos,
+  float,
+  hash,
+  instanceIndex,
+  instancedArray,
+  mix,
+  sin,
+  time,
+  uv,
+  vec3,
+  vec4,
+} from "three/tsl";
 import { AdditiveBlending, Color, Sprite, SpriteNodeMaterial, type Blending } from "three/webgpu";
 
 /** sRGB hex → linear TSL vec3 (three's Color constructor does the sRGB → linear conversion). */
@@ -47,6 +59,10 @@ export interface PointSpritesOptions {
   depthTest?: boolean;
   blending?: Blending;
   renderOrder?: number;
+  /** Phase 10.4: a slow per-point wander in the sprite's xy plane — each point is offset by
+   *  vec3(sin(ωt + h₁), cos(0.8ωt + h₂), 0)·amount with ω = 2π/period and h₁/h₂ hashed from the
+   *  instance index, so no two points move together. Omit it (reduced motion) for static points. */
+  drift?: { amount: number; period: number };
 }
 
 export interface PointSprites {
@@ -54,12 +70,23 @@ export interface PointSprites {
   dispose(): void;
 }
 
+/** Per-point sine wander, hashed on the instance index so each sprite has its own phase. */
+function driftOffset(d: { amount: number; period: number }) {
+  const omega = (Math.PI * 2) / d.period;
+  const h1 = hash(instanceIndex.add(7)).mul(Math.PI * 2);
+  const h2 = hash(instanceIndex.add(11)).mul(Math.PI * 2);
+  const t = time.mul(omega);
+  return vec3(sin(t.add(h1)), cos(t.mul(0.8).add(h2)), 0).mul(d.amount);
+}
+
 /** One instanced draw of Ali's Phase 10 soft round sprites at static positions (the repo's
  *  Sparks.ts pattern): additive, no depth writes, size attenuation, never tone mapped. */
 export function createPointSprites(o: PointSpritesOptions): PointSprites {
   const count = o.points.length / 3;
   const material = new SpriteNodeMaterial();
-  material.positionNode = instancedArray(o.points, "vec3").element(instanceIndex);
+  const base = vec3(instancedArray(o.points, "vec3").element(instanceIndex));
+  material.positionNode =
+    o.drift && o.drift.amount > 0 && o.drift.period > 0 ? base.add(driftOffset(o.drift)) : base;
   const h = hash(instanceIndex.add(3));
   const jitter = (j: [number, number] | undefined) =>
     j ? float(j[0]).add(h.mul(j[1] - j[0])) : float(1);

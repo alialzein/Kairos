@@ -17,6 +17,12 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  * (LineSegments2 + Line2NodeMaterial, the drei <Line> equivalent; linewidth in px) drawn with
  * depthTest off and renderOrder 10 so they always sit on top of the bust; the sternum node is a
  * small instanced sprite cluster. Everything comes from sceneConfig.neck.
+ *
+ * Phase 10.4 (Ali) — "strands look beaded, not drawn": the fat lines drop to `neck.opacity` 0.3
+ * and `neck.strandPoints.perStrand` gold beads ride over each strand (per-bead sizes drawn from
+ * `strandPoints.size`, seeded off `neck.seed`); the sternum cluster grows to `node.points` 40 and
+ * gains one bright `node.core` sprite at its centre. All three sprite layers keep depthTest off
+ * and sit above the lines (renderOrder 11 / 12). Static — no per-frame work beyond the dashes.
  */
 export function NeckCircuit() {
   const scene = useThree((s) => s.scene);
@@ -32,6 +38,7 @@ export function NeckCircuit() {
         neckRadius: bust.neckRadius,
         lift: neck.lift,
         points: neck.points,
+        strandPoints: neck.strandPoints.perStrand,
         node: neck.node,
       },
       mulberry32(neck.seed),
@@ -95,17 +102,47 @@ export function NeckCircuit() {
       pulse = { lines: pulseLines, material: pulseMaterial, geometry: pulseGeometry };
     }
 
+    // the beads over the strands: per-bead PointsMaterial sizes from a stream seeded off
+    // neck.seed (the node cluster owns `neck.seed` itself), converted through the shared unit
+    const fov = currentVerticalFov();
+    const { particles } = sceneConfig;
+    const beadRng = mulberry32(neck.seed + 1);
+    const [sizeMin, sizeMax] = neck.strandPoints.size;
+    const beadSizes = new Float32Array(circuit.strandPoints.length / 3);
+    for (let i = 0; i < beadSizes.length; i++)
+      beadSizes[i] = sizeMin + beadRng() * (sizeMax - sizeMin);
+    const beads = createPointSprites({
+      points: circuit.strandPoints,
+      size: spriteSizeForPointSize(particles.sizeScale, fov),
+      sizes: beadSizes,
+      color: palette.gold,
+      opacity: neck.strandPoints.opacity,
+      depthTest: false,
+      renderOrder: 11,
+    });
+
     const cluster = createPointSprites({
       points: circuit.nodePoints,
-      size: spriteSizeForPointSize(neck.node.pointSize, currentVerticalFov()),
+      size: spriteSizeForPointSize(neck.node.pointSize, fov),
       color: palette.gold,
       opacity: 1,
       depthTest: false,
       renderOrder: 11,
     });
 
+    // one bright sprite at the node centre — the cluster's hot core
+    const core = createPointSprites({
+      points: Float32Array.from(circuit.node),
+      size: spriteSizeForPointSize(neck.node.core.size * particles.sizeScale, fov),
+      color: palette.gold,
+      opacity: neck.node.core.opacity,
+      depthTest: false,
+      renderOrder: 12,
+    });
+
+    const sprites = [beads.sprite, cluster.sprite, core.sprite];
     return {
-      objects: pulse ? [lines, pulse.lines, cluster.sprite] : [lines, cluster.sprite],
+      objects: pulse ? [lines, pulse.lines, ...sprites] : [lines, ...sprites],
       pulse,
       speed: neckPulse.speed,
       dispose() {
@@ -113,7 +150,9 @@ export function NeckCircuit() {
         lineMaterial.dispose();
         pulse?.geometry.dispose();
         pulse?.material.dispose();
+        beads.dispose();
         cluster.dispose();
+        core.dispose();
       },
     };
   }, []);

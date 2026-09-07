@@ -178,20 +178,26 @@ export interface SceneConfig {
     /** plan: material `transparent, opacity 0.9`. Applied as a multiplier on `palette.gold`
      *  instead — the fat-line material stays opaque because a transparent Line2NodeMaterial
      *  composites against a per-frame framebuffer copy + mip chain. Identical over the dark
-     *  fill; where strands cross contour lines they cover them instead of letting 10 % through */
+     *  fill; where strands cross contour lines they cover them instead of letting 10 % through.
+     *  Phase 10.4: the line under the beads */
     opacity: number;
     /** how far in front of the neck cylinder the strands sit (plan: 0.02) */
     lift: number;
     /** samples per strand (plan: 40) */
     points: number;
+    /** Phase 10.4 (Ali): each strand becomes `perStrand` gold beads over the line — per-bead
+     *  size drawn uniformly from `size` (PointsMaterial units × `particles.sizeScale`) */
+    strandPoints: { perStrand: number; size: [number, number]; opacity: number };
     /** sternum node: cluster points + spread, radiating spokes + length, point size in
-     *  PointsMaterial units (plan: 0.02; converted to a sprite size at render time) */
+     *  PointsMaterial units (plan: 0.02; converted to a sprite size at render time), and
+     *  (Phase 10.4) one bright `core` sprite at the node centre, same units */
     node: {
       points: number;
       spread: number;
       spokes: number;
       spokeLength: number;
       pointSize: number;
+      core: { size: number; opacity: number };
     };
     seed: number;
   };
@@ -205,6 +211,33 @@ export interface SceneConfig {
     opacityTo: number;
     /** RingGeometry theta segments (plan: 160) */
     segments: number;
+    /** Phase 10.4: the annuli at ×0.6 under the beads */
+    geometryOpacity: number;
+    /** Phase 10.4 (Ali): `perRing` beads scattered along each ring at the mid-annulus radius
+     *  ± `radialJitter`, `size` in PointsMaterial units × `particles.sizeScale`, `opacity`
+     *  fading with the ring it rides on */
+    points: {
+      perRing: number;
+      radialJitter: number;
+      size: number;
+      opacity: number;
+      seed: number;
+    };
+    /** Phase 10.4 (Ali): faint dust drifting around the head — `count` points in a disc of
+     *  `radius` in x/y around `bust.headCenter`, z uniform in `depth` relative to its z. Each
+     *  point drifts by up to `amount` world units on a per-point-hashed sine of TSL time with
+     *  period `period` seconds; still under reduced motion. (drei `<Sparkles>` has no WebGPU
+     *  equivalent in this repo, so it is the shared Phase 10 sprite with a drift offset.) */
+    drift: {
+      count: number;
+      radius: number;
+      size: number;
+      opacity: number;
+      depth: [number, number];
+      amount: number;
+      period: number;
+      seed: number;
+    };
   };
   landscape: {
     xStart: number;
@@ -431,14 +464,24 @@ export const sceneConfig: SceneConfig = {
     controlY: 0.41,
     controlXFactor: 1.3,
     lineWidth: 1.5,
-    opacity: 0.9,
+    opacity: 0.3,
     lift: 0.02,
     points: 40,
-    node: { points: 20, spread: 0.06, spokes: 6, spokeLength: 0.1, pointSize: 0.04 },
+    strandPoints: { perStrand: 60, size: [0.02, 0.03], opacity: 1 },
+    node: {
+      points: 40,
+      spread: 0.06,
+      spokes: 6,
+      spokeLength: 0.1,
+      pointSize: 0.04,
+      core: { size: 0.12, opacity: 1 },
+    },
     seed: 5,
   },
 
   // Ali round 1 Phase 6: 9 rings, outer radius 0.9 + 8·0.25 = 2.9 (≤ 2.9), opacity 0.4 → 0.03
+  // Phase 10.4 (Ali): the annuli drop to ×0.6 and carry 250 beads each; 400 drifting dust
+  // points fill a 3.5-unit disc around the head
   rings: {
     center: [0, 1.45, -1.3],
     count: 9,
@@ -448,6 +491,18 @@ export const sceneConfig: SceneConfig = {
     opacityFrom: 0.4,
     opacityTo: 0.03,
     segments: 160,
+    geometryOpacity: 0.6,
+    points: { perRing: 250, radialJitter: 0.03, size: 0.02, opacity: 1, seed: 17 },
+    drift: {
+      count: 400,
+      radius: 3.5,
+      size: 0.03,
+      opacity: 0.25,
+      depth: [-1.3, 0.2],
+      amount: 0.06,
+      period: 8,
+      seed: 19,
+    },
   },
 
   // Ali round 1 Phase 7: amplitude 1.6 → 1.0, ridge lowScale 0.55 → 0.35 (broader peaks),

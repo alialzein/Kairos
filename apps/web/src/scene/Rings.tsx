@@ -2,9 +2,12 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { Color, DoubleSide, Group, Mesh, MeshBasicNodeMaterial, RingGeometry } from "three/webgpu";
-import { ringSpecs } from "./gen/rings";
+import { mulberry32 } from "@/avatar/sim/random";
+import { currentVerticalFov } from "./framing";
+import { driftPoints, ringPoints, ringSpecs } from "./gen/rings";
 import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
+import { createPointSprites, spriteSizeForPointSize, type PointSprites } from "./tsl";
 
 /**
  * Phase 6 — thin concentric rings behind the head (docs/plans/scene-plan.md Phase 6): one
@@ -12,20 +15,34 @@ import { sceneConfig } from "./sceneConfig";
  * facing the camera, `palette.line` at an opacity that fades outward. The opaque bust in front
  * occludes them naturally. The renderer's 4× MSAA keeps the ~2 px annuli smooth (the plan's
  * "no aliased LineBasicMaterial circles" rule).
+ *
+ * Phase 10.4 (Ali) — "rings look beaded, not drawn": each annulus drops to
+ * `rings.geometryOpacity` of its opacity and carries `rings.points.perRing` soft sprites
+ * scattered along its circle (±`radialJitter` radially), added as a CHILD of the ring mesh so the
+ * Phase 9 breathing scale carries the beads too; bead opacity fades with the ring (the innermost
+ * ring's beads sit at the full `points.opacity`). Plus one drifting dust layer around the head —
+ * `rings.drift.count` faint sprites in a disc, each wandering on TSL time (drei `<Sparkles>` has
+ * no WebGPU equivalent here, so it is the shared Phase 10 sprite with the `drift` offset). The
+ * dust keeps depthTest on so the bust occludes the points behind it; it holds still under
+ * reduced motion.
  */
 export function Rings() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { rings, palette } = sceneConfig;
+    const { rings, bust, palette, particles } = sceneConfig;
+    const fov = currentVerticalFov();
     const group = new Group();
     group.position.set(...rings.center);
     const color = new Color(palette.line);
     const meshes: Mesh<RingGeometry, MeshBasicNodeMaterial>[] = [];
+    const sprites: PointSprites[] = [];
+    const beadRng = mulberry32(rings.points.seed);
+    const beadSize = spriteSizeForPointSize(rings.points.size * particles.sizeScale, fov);
     for (const spec of ringSpecs(rings)) {
       const material = new MeshBasicNodeMaterial({
         color,
         transparent: true,
-        opacity: spec.opacity,
+        opacity: spec.opacity * rings.geometryOpacity,
         side: DoubleSide,
         depthWrite: false,
       });
@@ -34,17 +51,50 @@ export function Rings() {
         new RingGeometry(spec.radius, spec.radius + rings.thickness, rings.segments),
         material,
       );
+      const beads = createPointSprites({
+        points: ringPoints(
+          spec,
+          {
+            perRing: rings.points.perRing,
+            radialJitter: rings.points.radialJitter,
+            thickness: rings.thickness,
+          },
+          beadRng,
+        ),
+        size: beadSize,
+        color: palette.line,
+        opacity: (rings.points.opacity * spec.opacity) / rings.opacityFrom,
+      });
+      sprites.push(beads);
+      mesh.add(beads.sprite); // bead positions are ring-local: they breathe with the ring
       meshes.push(mesh);
       group.add(mesh);
     }
+
+    const drift = createPointSprites({
+      points: driftPoints(rings.drift, mulberry32(rings.drift.seed)),
+      size: spriteSizeForPointSize(rings.drift.size * particles.sizeScale, fov),
+      color: palette.line,
+      opacity: rings.drift.opacity,
+      sizeJitter: [0.6, 1.4],
+      opacityJitter: [0.5, 1],
+      depthTest: true,
+      ...(sceneMotionEnabled()
+        ? { drift: { amount: rings.drift.amount, period: rings.drift.period } }
+        : {}),
+    });
+    drift.sprite.position.set(...bust.headCenter);
+    sprites.push(drift);
+
     return {
-      group,
+      objects: [group, drift.sprite] as const,
       meshes,
       dispose() {
         for (const mesh of meshes) {
           mesh.geometry.dispose();
           mesh.material.dispose();
         }
+        for (const s of sprites) s.dispose();
       },
     };
   }, []);
@@ -66,9 +116,9 @@ export function Rings() {
   });
 
   useEffect(() => {
-    scene.add(built.group);
+    scene.add(...built.objects);
     return () => {
-      scene.remove(built.group);
+      scene.remove(...built.objects);
       built.dispose();
     };
   }, [scene, built]);

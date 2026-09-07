@@ -11,6 +11,7 @@ const p: NeckParams = {
   neckRadius: 0.2,
   lift: 0.02,
   points: 40,
+  strandPoints: 60,
   node: { points: 10, spread: 0.03, spokes: 6, spokeLength: 0.05 },
 };
 
@@ -60,6 +61,27 @@ describe("neckCircuit", () => {
     for (let i = 0; i < 10; i++) {
       const d = Math.hypot(c.nodePoints[i * 3] ?? 0, (c.nodePoints[i * 3 + 1] ?? 0) - p.nodeY);
       expect(d).toBeLessThanOrEqual(0.03 + 1e-9);
+    }
+  });
+  it("samples strandPoints beads per strand along each bezier, on the neck cylinder", () => {
+    expect(c.strandPointCount).toBe(60);
+    expect(c.strandPoints.length).toBe(6 * 60 * 3);
+    for (let k = 0; k < 6; k++) {
+      const at = (i: number) => {
+        const o = (k * 60 + i) * 3;
+        return [c.strandPoints[o] ?? 0, c.strandPoints[o + 1] ?? 0, c.strandPoints[o + 2] ?? 0];
+      };
+      const first = at(0);
+      const last = at(59);
+      expect(first[0]).toBeCloseTo(p.jawXs[k] ?? 0, 6);
+      expect(first[1]).toBeCloseTo(p.jawY, 6);
+      expect(last[0]).toBeCloseTo(0, 6);
+      expect(last[1]).toBeCloseTo(p.nodeY, 6);
+      expect(last[2]).toBeCloseTo(c.node[2], 6);
+      for (let i = 0; i < 60; i++) {
+        const v = at(i);
+        expect(v[2]).toBeCloseTo(neckZ(v[0] ?? 0, 0.2, 0.02), 6);
+      }
     }
   });
   it("is deterministic per seed", () => {
