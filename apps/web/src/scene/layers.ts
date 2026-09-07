@@ -6,6 +6,7 @@ export const LAYER_PHASE: Record<LayerName, number> = {
   stars: 1,
   bust: 2,
   contours: 3,
+  shell: 10,
   core: 4,
   neck: 5,
   rings: 6,

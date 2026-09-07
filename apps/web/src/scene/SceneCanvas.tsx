@@ -217,7 +217,7 @@ export function SceneCanvas({
         <SceneCamera />
         {layers.background ? <Background /> : null}
         {layers.stars ? <Stars /> : null}
-        {layers.bust ? <Bust contours={layers.contours} /> : null}
+        {layers.bust ? <Bust contours={layers.contours} shell={layers.shell} /> : null}
         {layers.core ? <FaceCore /> : null}
         {layers.neck ? <NeckCircuit /> : null}
         {layers.rings ? <Rings /> : null}

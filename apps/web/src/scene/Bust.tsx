@@ -3,6 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type BufferGeometry, Color, FrontSide, Mesh, MeshBasicNodeMaterial } from "three/webgpu";
 import { loadBust } from "@/avatar/sim/bust";
+import { createBustShell } from "./BustShell";
 import { createContourMaterial } from "./ContourMaterial";
 import { meshBust, primitiveBust } from "./gen/bustGeometry";
 import { sceneMotionEnabled } from "./motion";
@@ -14,10 +15,12 @@ import { useSceneStore } from "./store";
  * (welded + smooth normals, scaled into scene units) or the plan's primitive fallback.
  * Phase 2 material: flat `palette.fill` so only the silhouette shows. `contours` (Phase 3)
  * swaps in the contour-line material; false keeps this flat fill for comparison.
+ * `shell` (Phase 10.2) adds the particle shell sampled over the same geometry (BustShell.ts)
+ * on top of the mesh, which is unchanged either way.
  * Reports `bustReady` to the store once the mesh is in the scene (the canvas's `ready` waits
  * for it) and `error` if the mesh fails to load.
  */
-export function Bust({ contours }: { contours: boolean }) {
+export function Bust({ contours, shell }: { contours: boolean; shell: boolean }) {
   const scene = useThree((s) => s.scene);
   const [geometry, setGeometry] = useState<BufferGeometry | null>(() =>
     sceneConfig.bust.source === "primitives" ? primitiveBust(sceneConfig.bust) : null,
@@ -76,5 +79,17 @@ export function Bust({ contours }: { contours: boolean }) {
       useSceneStore.getState().setBustReady(false);
     };
   }, [scene, geometry, material]);
+
+  // Phase 10.2 — the particle shell over the same geometry, its own object so toggling it
+  // never rebuilds the mesh
+  useEffect(() => {
+    if (!geometry || !shell) return;
+    const built = createBustShell(geometry, sceneConfig);
+    scene.add(built.sprite);
+    return () => {
+      scene.remove(built.sprite);
+      built.dispose();
+    };
+  }, [scene, geometry, shell]);
   return null;
 }

@@ -15,6 +15,7 @@ export const LAYER_NAMES = [
   "stars",
   "bust",
   "contours",
+  "shell",
   "core",
   "neck",
   "rings",
@@ -109,6 +110,20 @@ export interface SceneConfig {
         recess: number;
         feather: number;
       }[];
+    };
+    /** Phase 10.2 (Ali): particle shell — `count` points sampled over the bust surface, pushed
+     *  `push` along the sampled normal, drawn as soft sprites of a random `size` (PointsMaterial
+     *  units, scaled by `particles.sizeScale`). Alpha = `alphaMin` + (1 − `alphaMin`)·fresnel (the
+     *  contour shader's fresnel, `contours.fresnelPower`), so the cloud is bright at the silhouette
+     *  and nearly invisible on the front — the glowing edge mist of the reference — times
+     *  `opacity`. `seed` drives the sampler and the push/size draws. */
+    shell: {
+      count: number;
+      push: [number, number];
+      size: [number, number];
+      alphaMin: number;
+      opacity: number;
+      seed: number;
     };
     headCenter: Vec3;
     headRadius: number;
@@ -292,6 +307,7 @@ export const sceneConfig: SceneConfig = {
     stars: true,
     bust: true,
     contours: true,
+    shell: true,
     core: true,
     neck: true,
     rings: true,
@@ -352,6 +368,14 @@ export const sceneConfig: SceneConfig = {
           feather: 0.03,
         },
       ],
+    },
+    shell: {
+      count: 25000,
+      push: [0.01, 0.04],
+      size: [0.01, 0.025],
+      alphaMin: 0.15,
+      opacity: 1,
+      seed: 13,
     },
     headCenter: [0, 1.45, 0],
     headRadius: 0.5,
