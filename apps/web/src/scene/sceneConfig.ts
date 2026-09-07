@@ -256,7 +256,8 @@ export const sceneConfig: SceneConfig = {
     hud: true,
   },
 
-  camera: { position: [0, 1.0, 5.5], fov: 32, lookAt: [0, 1.05, 0], near: 0.1, far: 200 },
+  // Ali round 1: z 5.5 → 6.0 to give the rings and head some air
+  camera: { position: [0, 1.0, 6.0], fov: 32, lookAt: [0, 1.05, 0], near: 0.1, far: 200 },
 
   render: { antialias: true },
 
