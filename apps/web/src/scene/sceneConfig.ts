@@ -113,7 +113,7 @@ export interface SceneConfig {
     };
     /** Phase 10.2 (Ali): particle shell — `count` points sampled over the bust surface, pushed
      *  `push` along the sampled normal, drawn as soft sprites of a random `size` (PointsMaterial
-     *  units, scaled by `particles.sizeScale`). Alpha = `alphaMin` + (1 − `alphaMin`)·fresnel (the
+     *  units, scaled by `particles.sizeScale`). Alpha = `alphaMin` + `alphaRim`·fresnel (the
      *  contour shader's fresnel, `contours.fresnelPower`), so the cloud is bright at the silhouette
      *  and nearly invisible on the front — the glowing edge mist of the reference — times
      *  `opacity`. `seed` drives the sampler and the push/size draws. */
@@ -122,6 +122,8 @@ export interface SceneConfig {
       push: [number, number];
       size: [number, number];
       alphaMin: number;
+      /** alpha = alphaMin + alphaRim · fresnel; Phase 10 had 0.15 + 0.85, Phase 11.2 0.03 + 0.6 */
+      alphaRim: number;
       opacity: number;
       seed: number;
     };
@@ -381,7 +383,7 @@ export const sceneConfig: SceneConfig = {
   palette: {
     bgTop: "#020B1F",
     bgBottom: "#082041",
-    fill: "#041634",
+    fill: "#020C22", // Phase 11.2 (Ali): was #041634 — the bust read as a solid teal block
     line: "#35C8FF",
     edge: "#9BE9FF",
     core: "#FF9A3C",
@@ -413,11 +415,17 @@ export const sceneConfig: SceneConfig = {
         },
       ],
     },
+    // Phase 11.2 (Ali): the density pass on the shell — "a soft glowing mist at the silhouette,
+    // not visible dots". 25k → 80k points at half the size (0.01–0.025 → 0.005–0.0125), and the
+    // alpha curve drops on both ends (0.15 + 0.85·fresnel → 0.03 + 0.6·fresnel) so the front face
+    // stays readable and the rim glows without the individual sprites showing. No pulse: the
+    // shell tint is static (Ali).
     shell: {
-      count: 25000,
+      count: 80000,
       push: [0.01, 0.04],
-      size: [0.01, 0.025],
-      alphaMin: 0.15,
+      size: [0.005, 0.0125],
+      alphaMin: 0.03,
+      alphaRim: 0.6,
       opacity: 1,
       seed: 13,
     },
@@ -437,9 +445,11 @@ export const sceneConfig: SceneConfig = {
   // cyan haze (docs/screens/phase-8-alt-plan-values.png); 45 matches the reference's ~45 lines
   // on the head and keeps dark fill between them (Phase 3/8 acceptance).
   // Ali round 1 Phase 3: lineWidth 0.10 → 0.05, rim 0.6 → 0.9, exact line colour (boost 0)
+  // Phase 11.2 (Ali): lineWidth 0.05 → 0.04 with the darker `palette.fill` — the lines must be
+  // visibly separated by dark, not merge into one teal block.
   contours: {
     frequency: 45,
-    lineWidth: 0.05,
+    lineWidth: 0.04,
     fresnelPower: 2.5,
     rimStrength: 0.9,
     lineBoost: 0,

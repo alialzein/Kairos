@@ -25,9 +25,11 @@ export interface BustShell {
 /**
  * Phase 10.2 (Ali) — the bust's glowing edge mist. `bust.shell.count` soft sprites (the shared
  * Phase 10 disc) sampled over the bust mesh and pushed just off its skin (gen/shell.ts), drawn
- * with the contour shader's own fresnel: alpha = alphaMin + (1 − alphaMin)·(1 − max(n·v, 0))^
+ * with the contour shader's own fresnel: alpha = alphaMin + alphaRim·(1 − max(n·v, 0))^
  * `contours.fresnelPower`, so the cloud is bright where the surface turns away from the camera —
  * the silhouette reads as particles — and nearly invisible over the face, which stays readable.
+ * Phase 11.2 (Ali) makes alphaRim its own number (was the implied 1 − alphaMin): at 80k points of
+ * half the size, 0.03 + 0.6·fresnel is a soft mist at the silhouette instead of visible dots.
  * Colour follows the contour shader too: `palette.line`, tinted toward `palette.core` by
  * 1 − smoothstep(0, core.radius, |p − core.center|). Additive, no depth writes, drawn after the
  * opaque bust (renderOrder 1). Static — no per-frame work; the sizes are PointsMaterial units
@@ -67,7 +69,7 @@ export function createBustShell(geometry: BufferGeometry, cfg: SceneConfig): Bus
     1,
   );
   material.opacityNode = softDisc()
-    .mul(float(s.alphaMin).add(float(1 - s.alphaMin).mul(fres)))
+    .mul(float(s.alphaMin).add(float(s.alphaRim).mul(fres)))
     .mul(s.opacity);
   material.transparent = true;
   material.depthTest = true;
