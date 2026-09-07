@@ -258,16 +258,32 @@ export interface SceneConfig {
     opacityTo: number;
     /** RingGeometry theta segments (plan: 160) */
     segments: number;
-    /** Phase 10.4: the annuli at ×0.6 under the beads */
+    /** Phase 10.4: the annuli at ×0.6 under the beads.
+     *  Phase 12.5: ×0.4 — a faint guide line under the beads */
     geometryOpacity: number;
     /** Phase 10.4 (Ali): `perRing` beads scattered along each ring at the mid-annulus radius
      *  ± `radialJitter`, `size` in PointsMaterial units × `particles.sizeScale`, `opacity`
-     *  fading with the ring it rides on */
+     *  fading with the ring it rides on.
+     *  Phase 12.5 (Ali): "rings read as particle rings with a faint guide line, not lines with
+     *  dots" — 250 → 1,500 beads per ring, no longer at a uniform angle:
+     *  - `brightness` = per-bead COLOUR multiplier range, drawn uniformly per bead (a value > 1
+     *    feeds bloom on the half-float buffer, Phase 12.1, which an opacity > 1 never could).
+     *  - `density` = the angular density field. An angle θ is accepted with probability
+     *    `floor + (1 − floor)·(0.5 + 0.5·noise(cos θ·scale, sin θ·scale, ringIndex))`, so some
+     *    arcs come out dense and some sparse. The noise is sampled on the unit circle, not on θ,
+     *    which keeps the field continuous across 2π (noise(θ) would leave a seam at the wrap);
+     *    `scale` = how many dense/sparse lobes fit round a ring, `floor` = the sparsest arc's
+     *    share of the peak density.
+     *  - `noiseSeed` seeds that field (one field shared by every ring, walked along its third
+     *    axis by the ring index); `seed` seeds the angle/radius/brightness draws. */
     points: {
       perRing: number;
       radialJitter: number;
       size: number;
       opacity: number;
+      brightness: [number, number];
+      density: { scale: number; floor: number };
+      noiseSeed: number;
       seed: number;
     };
   };
@@ -614,6 +630,9 @@ export const sceneConfig: SceneConfig = {
   // Ali round 1 Phase 6: 9 rings, outer radius 0.9 + 8·0.25 = 2.9 (≤ 2.9), opacity 0.4 → 0.03
   // Phase 10.4 (Ali): the annuli drop to ×0.6 and carry 250 beads each (Phase 11.4 moved the
   // drifting dust out to its own `dust` layer)
+  // Phase 12.5 (Ali): "rings → particle rings" — 250 → 1,500 beads per ring with a noise-driven
+  // angular density (dense arcs and sparse ones) and a 0.5–1.2 per-bead brightness, over an
+  // annulus dimmed ×0.4 (0.6 → 0.24): the beads are the ring now, the line is only its guide.
   rings: {
     center: [0, 1.45, -1.3],
     count: 9,
@@ -623,8 +642,17 @@ export const sceneConfig: SceneConfig = {
     opacityFrom: 0.4,
     opacityTo: 0.03,
     segments: 160,
-    geometryOpacity: 0.6,
-    points: { perRing: 250, radialJitter: 0.03, size: 0.02, opacity: 1, seed: 17 },
+    geometryOpacity: 0.24,
+    points: {
+      perRing: 1500,
+      radialJitter: 0.03,
+      size: 0.02,
+      opacity: 1,
+      brightness: [0.5, 1.2],
+      density: { scale: 3, floor: 0.15 },
+      noiseSeed: 29,
+      seed: 17,
+    },
   },
 
   // Phase 11.4 (Ali): the density pass on the air itself — 2,500 dust points in a 6 × 4 × 3
