@@ -19,16 +19,18 @@ import { attribute, float, sin, time } from "three/tsl";
 import { createPointSprites, spriteSizeForPointSize } from "./tsl";
 
 /**
- * Phase 7 — wireframe mountain networks on both sides (docs/plans/scene-plan.md Phase 7): the
- * generator's grid points as one instanced sprite draw, and its kept edges as two 1 px
- * LineSegments (blue, and the gold ridge tops), all additive with depth writes off. The seeded
- * ridge noise is the repo's simplex (sim/noise.ts, noise2D(x, y) = noise3(x, y, 0)) instead of
- * the simplex-noise package, so no new dependency. Static: no per-frame work.
+ * Phase 7 — wireframe mountain networks on both sides (docs/plans/scene-plan.md Phase 7), rebuilt
+ * in Phase 10.1 (Ali) as a plexus network: nodes first, edges second. Five objects — blue node
+ * sprites (per-node sizes), gold node sprites at goldSizeFactor×, unconnected sprinkle dust, and
+ * the k-nearest-neighbour edges as two 1 px LineSegments (blue hints, and the gold peaks) — all
+ * additive with depth writes off. The seeded ridge noise is the repo's simplex (sim/noise.ts,
+ * noise2D(x, y) = noise3(x, y, 0)) instead of the simplex-noise package, so no new dependency.
+ * Static: no per-frame work.
  */
 export function Landscape() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { landscape: base, palette, perf, motion } = sceneConfig;
+    const { landscape: base, palette, perf, motion, particles } = sceneConfig;
     // Phase 9 perf: half the columns on mobile widths
     const cols =
       typeof window === "undefined" ? base.cols : landscapeCols(window.innerWidth, base.cols, perf);
@@ -56,7 +58,7 @@ export function Landscape() {
       obj.frustumCulled = false;
       return obj;
     };
-    const blue = lines(mesh.blue, mesh.blueFade, palette.landscape, l.blueOpacity);
+    const blue = lines(mesh.blue, mesh.blueFade, palette.landscape, l.edgeOpacity);
     const gold = lines(mesh.gold, mesh.goldFade, palette.gold, l.goldOpacity);
     // Phase 9: gold shimmer — opacity between from and to on TSL time (no per-frame JS work);
     // the plan's "if a shimmer is wanted, animate the gold opacity between 0.6 and 0.9 slowly"
@@ -68,22 +70,44 @@ export function Landscape() {
         .add(sin(time.mul((Math.PI * 2) / goldShimmer.period)).mul(half))
         .mul(fadeAttr);
     }
-    const points = createPointSprites({
-      points: mesh.points,
-      size: spriteSizeForPointSize(l.pointSize, currentVerticalFov()),
+    // the generator's node sizes are PointsMaterial units, so the sprite size is the unit
+    // conversion factor for a PointsMaterial size of 1 (× the Phase 10 scale) and the per-node
+    // sizes do the rest
+    const unit = spriteSizeForPointSize(particles.sizeScale, currentVerticalFov());
+    const nodes = createPointSprites({
+      points: mesh.nodes,
+      size: unit,
+      sizes: mesh.nodeSizes,
       color: palette.landscape,
-      opacity: l.pointOpacity,
-      opacities: mesh.pointFade,
+      opacity: l.nodeOpacity,
+      opacities: mesh.nodeFade,
+    });
+    const goldNodes = createPointSprites({
+      points: mesh.goldNodes,
+      size: unit,
+      sizes: mesh.goldNodeSizes,
+      color: palette.gold,
+      opacity: l.nodeOpacity,
+      opacities: mesh.goldNodeFade,
+    });
+    const sprinkle = createPointSprites({
+      points: mesh.sprinkle,
+      size: spriteSizeForPointSize(l.sprinkle.size * particles.sizeScale, currentVerticalFov()),
+      color: palette.landscape,
+      opacity: l.sprinkle.opacity,
+      opacities: mesh.sprinkleFade,
     });
 
     return {
-      objects: [blue, gold, points.sprite] as const,
+      objects: [blue, gold, nodes.sprite, goldNodes.sprite, sprinkle.sprite] as const,
       dispose() {
         blue.geometry.dispose();
         blue.material.dispose();
         gold.geometry.dispose();
         gold.material.dispose();
-        points.dispose();
+        nodes.dispose();
+        goldNodes.dispose();
+        sprinkle.dispose();
       },
     };
   }, []);

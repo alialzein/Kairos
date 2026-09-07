@@ -61,6 +61,9 @@ export interface SceneConfig {
     mobileWidth: number;
     mobileColsFactor: number;
   };
+  /** Phase 10 (Ali): every point layer shares one soft sprite; the spec's point sizes are
+   *  starting values ("keep the ratios, tune the scale") — this multiplies all of them */
+  particles: { sizeScale: number };
   palette: {
     bgTop: string;
     bgBottom: string;
@@ -206,14 +209,30 @@ export interface SceneConfig {
      *  h = noise2D(x·lowScale, z·lowScale)·lowWeight + noise2D(x·highScale, z·highScale)·highWeight
      *  (round 3: 0.35/0.7 + 0.9/0.25) */
     ridge: { lowScale: number; lowWeight: number; highScale: number; highWeight: number };
-    dropout: number;
+    /** Phase 10.1 (Ali): plexus network — the grid is only where a node starts. Each node is
+     *  jittered by ±`jitter` in x and z (seeded) and re-sampled on the heightfield, then joined
+     *  to its k nearest neighbours on the same side, k drawn per node from
+     *  [neighbors[0], neighbors[1]] inclusive, skipping candidates farther than `maxEdge` world
+     *  units — so no long edges and no grid reading. */
+    jitter: number;
+    /** inclusive range the per-node neighbour count k is drawn from (Ali: {2, 3}) */
+    neighbors: [number, number];
+    /** longest edge in world units (Ali: 0.35) */
+    maxEdge: number;
+    /** per-node size range, PointsMaterial units (px = size · H/2 / depth); converted to a sprite
+     *  size at render time. Nodes are the hero, edges are hints (Ali) */
+    nodeSize: [number, number];
+    nodeOpacity: number;
+    edgeOpacity: number;
+    /** share of all nodes that turn gold, drawn ∝ (normalized height)² without replacement; an
+     *  edge with two gold endpoints is a gold edge */
     goldRatio: number;
-    /** PointsMaterial units (px = size · H/2 / depth); converted to a sprite size at render time */
-    pointSize: number;
-    pointOpacity: number;
-    blueOpacity: number;
+    /** gold nodes draw at this multiple of their own size (Ali: 1.5×) */
+    goldSizeFactor: number;
     goldOpacity: number;
-    /** simplex noise seed for the ridges and rng seed for the edge dropout */
+    /** tiny unconnected points per side, each within `radius` of a height²-weighted node (Ali) */
+    sprinkle: { count: number; size: number; opacity: number; radius: number };
+    /** simplex noise seed for the ridges and rng seed for the jitter, sizes, k, gold and sprinkle */
     noiseSeed: number;
     seed: number;
   };
@@ -294,6 +313,10 @@ export const sceneConfig: SceneConfig = {
     neckPulse: { strands: [1, 4], dash: 0.05, gap: 0.5, speed: 0.3 },
   },
   perf: { dprCapWidth: 1000, dprCap: 1.5, dprMax: 2, mobileWidth: 768, mobileColsFactor: 0.5 },
+
+  // Ali's starting sizes (landscape nodes 0.03–0.07) were ~2 px at this depth: edges dominated.
+  // ×3 makes the nodes the hero (docs/screens/phase-10/10-1.png); ratios unchanged.
+  particles: { sizeScale: 3 },
 
   palette: {
     bgTop: "#020B1F",
@@ -398,11 +421,15 @@ export const sceneConfig: SceneConfig = {
   },
 
   // Ali round 1 Phase 7: amplitude 1.6 → 1.0, ridge lowScale 0.55 → 0.35 (broader peaks),
-  // dropout 0.35 → 0.55, points 0.025 → 0.04 at opacity 0.9
+  // points 0.025 → 0.04 at opacity 0.9
+  // Phase 10.1 (Ali): plexus network — cols 36 → 42 so (cols + 1) × rows = 43 × 14 = 602 nodes
+  // per side ("~600"); jitter 0.06 breaks the grid, k ∈ {2, 3} nearest neighbours with a 0.35
+  // max length replaces the grid-neighbour rule and the dropout; nodes 0.03–0.07 at 0.9 are the
+  // hero, edges 0.25 are hints; gold 12 % of the nodes at 1.5×; 300 sprinkle points per side.
   landscape: {
     xStart: 1.2,
     xEnd: 4.0,
-    cols: 36,
+    cols: 42,
     rows: 14,
     zStart: -0.5,
     zStep: -0.35,
@@ -413,12 +440,16 @@ export const sceneConfig: SceneConfig = {
     fade: [-1.2, -0.4],
     falloff: [1.2, 2.2],
     ridge: { lowScale: 0.35, lowWeight: 0.7, highScale: 0.9, highWeight: 0.25 },
-    dropout: 0.55,
-    goldRatio: 0.1,
-    pointSize: 0.04,
-    pointOpacity: 0.9,
-    blueOpacity: 0.35,
+    jitter: 0.06,
+    neighbors: [2, 3],
+    maxEdge: 0.35,
+    nodeSize: [0.03, 0.07],
+    nodeOpacity: 0.9,
+    edgeOpacity: 0.25,
+    goldRatio: 0.12,
+    goldSizeFactor: 1.5,
     goldOpacity: 0.8,
+    sprinkle: { count: 300, size: 0.015, opacity: 0.5, radius: 0.15 },
     noiseSeed: 7,
     seed: 11,
   },
