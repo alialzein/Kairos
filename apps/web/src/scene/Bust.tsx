@@ -1,0 +1,80 @@
+"use client";
+import { useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type BufferGeometry, Color, FrontSide, Mesh, MeshBasicNodeMaterial } from "three/webgpu";
+import { loadBust } from "@/avatar/sim/bust";
+import { createContourMaterial } from "./ContourMaterial";
+import { meshBust, primitiveBust } from "./gen/bustGeometry";
+import { sceneMotionEnabled } from "./motion";
+import { sceneConfig } from "./sceneConfig";
+import { useSceneStore } from "./store";
+
+/**
+ * Phases 2 + 3 — the bust. Geometry per `sceneConfig.bust.source`: the repo's smooth bust mesh
+ * (welded + smooth normals, scaled into scene units) or the plan's primitive fallback.
+ * Phase 2 material: flat `palette.fill` so only the silhouette shows. `contours` (Phase 3)
+ * swaps in the contour-line material; false keeps this flat fill for comparison.
+ * Reports `bustReady` to the store once the mesh is in the scene (the canvas's `ready` waits
+ * for it) and `error` if the mesh fails to load.
+ */
+export function Bust({ contours }: { contours: boolean }) {
+  const scene = useThree((s) => s.scene);
+  const [geometry, setGeometry] = useState<BufferGeometry | null>(() =>
+    sceneConfig.bust.source === "primitives" ? primitiveBust(sceneConfig.bust) : null,
+  );
+  const owned = useRef<BufferGeometry | null>(geometry);
+
+  // glb path: async load, then weld/scale/offset (see gen/bustGeometry.ts)
+  useEffect(() => {
+    if (sceneConfig.bust.source !== "glb") return;
+    let cancelled = false;
+    loadBust(sceneConfig.bust.glb.url).then(
+      (raw) => {
+        if (cancelled) return;
+        const g = meshBust(raw.positions, raw.indices, sceneConfig.bust.glb);
+        owned.current = g;
+        setGeometry(g);
+      },
+      (e: unknown) => {
+        if (cancelled) return;
+        console.error("scene: bust mesh failed to load", e);
+        useSceneStore.getState().setError(`bust: ${e instanceof Error ? e.message : String(e)}`);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(
+    () => () => {
+      owned.current?.dispose();
+      owned.current = null;
+    },
+    [],
+  );
+
+  const material = useMemo(() => {
+    if (contours) {
+      const { material, uniforms } = createContourMaterial(sceneConfig);
+      // Phase 9: the slow upward line drift is motion — still under reduced motion
+      if (!sceneMotionEnabled()) uniforms.scrollSpeed.value = 0;
+      return material;
+    }
+    const m = new MeshBasicNodeMaterial({ color: new Color(sceneConfig.palette.fill) });
+    m.side = FrontSide;
+    return m;
+  }, [contours]);
+  useEffect(() => () => material.dispose(), [material]);
+
+  useEffect(() => {
+    if (!geometry) return;
+    const mesh = new Mesh(geometry, material);
+    scene.add(mesh);
+    useSceneStore.getState().setBustReady(true);
+    return () => {
+      scene.remove(mesh);
+      useSceneStore.getState().setBustReady(false);
+    };
+  }, [scene, geometry, material]);
+  return null;
+}
