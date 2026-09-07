@@ -20,8 +20,9 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  *
  * Phase 10.4 (Ali) — "strands look beaded, not drawn": the fat lines drop to `neck.opacity` 0.3
  * and `neck.strandPoints.perStrand` gold beads ride over each strand (per-bead sizes drawn from
- * `strandPoints.size`, seeded off `neck.seed`); the sternum cluster grows to `node.points` 40 and
- * gains one bright `node.core` sprite at its centre. All three sprite layers keep depthTest off
+ * `strandPoints.size`, seeded off `neck.seed`); the sternum cluster grows (Phase 12.6: into
+ * `neck.nucleus`) and gains one bright core sprite at its centre. All three sprite layers keep
+ * depthTest off
  * and sit above the lines (renderOrder 11 / 12). Static — no per-frame work beyond the dashes.
  *
  * Phase 11.3 (Ali) — "gold nerves/veins, not a harp": `neck.branches` sub-branches leave every
@@ -29,11 +30,18 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  * strands keep their own), their beads are one more sprite layer, and the bright bead at each
  * branch point and tip is a third. Strand and branch beads are dimmed per bead by the generator's
  * brightness draws, so the circuitry reads as nerves rather than an even string of lights.
+ *
+ * Phase 12.6 (Ali) — "a glowing nucleus at the sternum fed by gold nerves": 10 strands on a wider
+ * `neck.cylinderRadius` cylinder, branches recursed to `branches.depth` 2, and the per-bead
+ * brightness moved from `opacities` to `brightness` (a colour multiplier: > 1 feeds the Phase 12.1
+ * bloom on the half-float buffer, which an opacity never could). The sternum cluster becomes
+ * `neck.nucleus` — one draw of 300 sprites mixed per point from `palette.edge` at the core to
+ * `palette.gold` at the rim — under the same hot core sprite, now blue-white at `core.brightness`.
  */
 export function NeckCircuit() {
   const scene = useThree((s) => s.scene);
   const built = useMemo(() => {
-    const { neck, bust, palette } = sceneConfig;
+    const { neck, palette } = sceneConfig;
     const circuit = neckCircuit(
       {
         jawY: neck.jawY,
@@ -41,13 +49,13 @@ export function NeckCircuit() {
         nodeY: neck.nodeY,
         controlY: neck.controlY,
         controlXFactor: neck.controlXFactor,
-        neckRadius: bust.neckRadius,
+        neckRadius: neck.cylinderRadius,
         lift: neck.lift,
         points: neck.points,
         strandPoints: neck.strandPoints.perStrand,
         strandBrightness: neck.strandPoints.brightness,
         branches: neck.branches,
-        node: neck.node,
+        nucleus: neck.nucleus,
       },
       mulberry32(neck.seed),
     );
@@ -134,8 +142,9 @@ export function NeckCircuit() {
       sizes: beadSizes,
       color: palette.gold,
       opacity: neck.strandPoints.opacity,
-      // Phase 11.3: per-bead 0.5–1.0 brightness on top of the layer opacity
-      opacities: circuit.strandBrightness,
+      // Phase 12.6: the per-bead 0.65–1.3 draw is a COLOUR multiplier now, not an opacity — the
+      // bright half of the range overdrives the bead into the bloom instead of clipping at white
+      brightness: circuit.strandBrightness,
       depthTest: false,
       renderOrder: 11,
     });
@@ -147,7 +156,7 @@ export function NeckCircuit() {
       sizes: branchSizes,
       color: palette.gold,
       opacity: neck.strandPoints.opacity,
-      opacities: circuit.branchBrightness,
+      brightness: circuit.branchBrightness,
       depthTest: false,
       renderOrder: 11,
     });
@@ -162,21 +171,26 @@ export function NeckCircuit() {
       renderOrder: 12,
     });
 
-    const cluster = createPointSprites({
-      points: circuit.nodePoints,
-      size: spriteSizeForPointSize(neck.node.pointSize, fov),
-      color: palette.gold,
+    // Phase 12.6: the nucleus — one draw over the sternum node, mixed per point from the
+    // blue-white core colour to gold at the rim and multiplied past 1 so it blooms
+    const nucleus = createPointSprites({
+      points: circuit.nucleusPoints,
+      size: spriteSizeForPointSize(neck.nucleus.pointSize, fov),
+      color: palette.edge,
+      colorMix: { to: palette.gold, mix: circuit.nucleusMix },
+      brightness: circuit.nucleusBrightness,
       opacity: 1,
       depthTest: false,
       renderOrder: 11,
     });
 
-    // one bright sprite at the node centre — the cluster's hot core
+    // one bright sprite at the node centre — the nucleus's hot core
     const core = createPointSprites({
       points: Float32Array.from(circuit.node),
-      size: spriteSizeForPointSize(neck.node.core.size * particles.sizeScale, fov),
-      color: palette.gold,
-      opacity: neck.node.core.opacity,
+      size: spriteSizeForPointSize(neck.nucleus.core.size * particles.sizeScale, fov),
+      color: palette.edge,
+      opacity: neck.nucleus.core.opacity,
+      brightness: Float32Array.of(neck.nucleus.core.brightness),
       depthTest: false,
       renderOrder: 12,
     });
@@ -185,7 +199,7 @@ export function NeckCircuit() {
       beads.sprite,
       branchBeads.sprite,
       endBeads.sprite,
-      cluster.sprite,
+      nucleus.sprite,
       core.sprite,
     ];
     return {
@@ -200,7 +214,7 @@ export function NeckCircuit() {
         beads.dispose();
         branchBeads.dispose();
         endBeads.dispose();
-        cluster.dispose();
+        nucleus.dispose();
         core.dispose();
       },
     };

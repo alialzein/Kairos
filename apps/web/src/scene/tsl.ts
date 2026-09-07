@@ -60,6 +60,10 @@ export interface PointSpritesOptions {
    *  emphasis. A value > 1 feeds bloom on the half-float buffer (Phase 12.1) instead of clipping,
    *  which an opacity > 1 could never do — emphasis belongs here, not in `opacities`. */
   brightness?: Float32Array;
+  /** Phase 12.6: a per-point mix of `color` toward `to` (0 = `color`, 1 = `to`), applied before
+   *  `brightness` — the sternum nucleus is one draw whose core is blue-white and whose outer
+   *  ring is gold. One float per point. */
+  colorMix?: { to: string; mix: Float32Array };
   depthTest?: boolean;
   blending?: Blending;
   renderOrder?: number;
@@ -98,7 +102,17 @@ export function createPointSprites(o: PointSpritesOptions): PointSprites {
     .mul(jitter(o.sizeJitter))
     .mul(o.sizes ? instancedArray(o.sizes, "float").element(instanceIndex) : float(1));
   const tint = o.tint ?? 1;
-  const color = tint >= 1 ? colorVec3(o.color) : vec3(mix(vec3(1, 1, 1), colorVec3(o.color), tint));
+  const tinted =
+    tint >= 1 ? colorVec3(o.color) : vec3(mix(vec3(1, 1, 1), colorVec3(o.color), tint));
+  const color = o.colorMix
+    ? vec3(
+        mix(
+          tinted,
+          colorVec3(o.colorMix.to),
+          instancedArray(o.colorMix.mix, "float").element(instanceIndex),
+        ),
+      )
+    : tinted;
   material.colorNode = vec4(
     o.brightness
       ? vec3(color.mul(instancedArray(o.brightness, "float").element(instanceIndex)))

@@ -203,6 +203,10 @@ export interface SceneConfig {
      *  Phase 10.4: the line under the beads. Phase 11.3: 0.3 → 0.15 — with the branches and
      *  twice the beads the strands must read as nerves, and the line is only their trace */
     opacity: number;
+    /** Phase 12.6 (Ali): the mesh neck is wider than the primitives' 0.2 (`bust.neckRadius`); the
+     *  strands hug a 0.3 cylinder so the outer strands still wrap. Everything the neck generator
+     *  lifts — strands, branches, node — uses this radius, not `bust.neckRadius`. */
+    cylinderRadius: number;
     /** how far in front of the neck cylinder the strands sit (plan: 0.02) */
     lift: number;
     /** samples per strand (plan: 40) */
@@ -226,25 +230,36 @@ export interface SceneConfig {
      *  sign is the one that turns it away from x = 0). `beadsPerUnit` = bead density along a
      *  branch — 120 beads over a ≈0.6-unit strand ≈ 200/unit, so branches bead like strands.
      *  `endBead` = the bright bead at each branch tip and at each branch point (size in
-     *  PointsMaterial units × `particles.sizeScale`). */
+     *  PointsMaterial units × `particles.sizeScale`).
+     *  Phase 12.6 (Ali): "sub-branches get their own sub-branches" — `depth` levels of branch,
+     *  each branch growing `sub.perBranch` of its own at `sub.at` of its length and
+     *  `sub.lengthFactor` × its length (so 0.06–0.15). `depth: 1` is Phase 11.3 exactly. */
     branches: {
       perStrand: [number, number];
       at: [number, number];
       length: [number, number];
       angle: [number, number];
       beadsPerUnit: number;
+      depth: number;
+      sub: { perBranch: [number, number]; at: [number, number]; lengthFactor: number };
       endBead: { size: number; opacity: number };
     };
-    /** sternum node: cluster points + spread, radiating spokes + length, point size in
-     *  PointsMaterial units (plan: 0.02; converted to a sprite size at render time), and
-     *  (Phase 10.4) one bright `core` sprite at the node centre, same units */
-    node: {
+    /** Phase 12.6 (Ali): the sternum node is a nucleus — `points` points over a disc of `radius`,
+     *  blue-white (`palette.edge`) inside `coreRadius` and gold (`palette.gold`) beyond it, each
+     *  half carrying its own colour multiplier (`coreBrightness` / `ringBrightness`, > 1 so the
+     *  nucleus blooms). `pointSize` is in PointsMaterial units (converted to a sprite size at
+     *  render time), `spokes`/`spokeLength` are the radiating segments, and `core` is the single
+     *  hot sprite at the centre (size in the same units, `brightness` its colour multiplier). */
+    nucleus: {
       points: number;
-      spread: number;
+      radius: number;
+      coreRadius: number;
+      coreBrightness: number;
+      ringBrightness: number;
+      pointSize: number;
       spokes: number;
       spokeLength: number;
-      pointSize: number;
-      core: { size: number; opacity: number };
+      core: { size: number; opacity: number; brightness: number };
     };
     seed: number;
   };
@@ -595,34 +610,45 @@ export const sceneConfig: SceneConfig = {
   // 0.95, converge at 0.15, and the control point keeps the plan's 45 % position between them.
   // Ali round 1 Phase 5: strands start at the chin bottom (measured world y 0.70 → jawY 0.67),
   // control point (x·0.6, midpoint y), sternum node doubled (points, spread, spokes, size)
+  // Phase 12.6 (Ali): 2 extra strands per side (10), further out on the neck; depth-2 branches;
+  // bead brightness ×1.3; the sternum node becomes a blooming nucleus fed by the gold nerves.
   neck: {
     jawY: 0.67,
     // round 2 item 3: jaw x scaled by 0.75, control x 0.6·x → 1.3·x (bow outward along the neck)
-    jawXs: [-0.165, -0.105, -0.045, 0.045, 0.105, 0.165],
+    // Phase 12.6: ±0.22 and ±0.27 added outside the original six
+    jawXs: [-0.27, -0.22, -0.165, -0.105, -0.045, 0.045, 0.105, 0.165, 0.22, 0.27],
     nodeY: 0.15,
     controlY: 0.41,
     controlXFactor: 1.3,
     lineWidth: 1.5,
     opacity: 0.15, // Phase 11.3 (Ali): was 0.3 — the beads and branches carry the strand now
+    cylinderRadius: 0.3, // Phase 12.6: the strands' cylinder, wider than bust.neckRadius (0.2)
     lift: 0.02,
     points: 40,
-    // Phase 11.3 (Ali): 60 → 120 beads, size ×0.7, brightness 0.5–1.0 per bead
-    strandPoints: { perStrand: 120, size: [0.014, 0.021], opacity: 1, brightness: [0.5, 1.0] },
+    // Phase 11.3 (Ali): 60 → 120 beads, size ×0.7, brightness per bead
+    // Phase 12.6 (Ali): brightness ×1.3 (0.5–1.0 → 0.65–1.3) and applied as a colour multiplier,
+    // so the top of the range is above 1 and feeds the bloom instead of just fading the bead
+    strandPoints: { perStrand: 120, size: [0.014, 0.021], opacity: 1, brightness: [0.65, 1.3] },
     branches: {
       perStrand: [2, 3],
       at: [0.3, 0.7],
       length: [0.12, 0.3],
       angle: [0.5, 1.1],
       beadsPerUnit: 200,
+      depth: 2,
+      sub: { perBranch: [1, 2], at: [0.4, 0.8], lengthFactor: 0.5 },
       endBead: { size: 0.05, opacity: 1 },
     },
-    node: {
-      points: 40,
-      spread: 0.06,
+    nucleus: {
+      points: 300,
+      radius: 0.08,
+      coreRadius: 0.05,
+      coreBrightness: 2.5,
+      ringBrightness: 1.6,
+      pointSize: 0.02,
       spokes: 6,
       spokeLength: 0.1,
-      pointSize: 0.04,
-      core: { size: 0.12, opacity: 1 },
+      core: { size: 0.12, opacity: 1, brightness: 3 },
     },
     seed: 5,
   },
