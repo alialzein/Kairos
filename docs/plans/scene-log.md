@@ -134,6 +134,14 @@ uniforms; one shared sprite helper (`scene/tsl.ts`) replaced three copies; a fra
 that fired every frame once its window filled; explicit disposal of the post render targets; the
 e2e now asserts scene frames, not the page's own loop. Visual output unchanged.
 
+The correctness lens (re-run 2026-09-07 after a usage-limit failure) added: `?set=` overrides
+are applied in the browser only (the bench page is also server-rendered, and a server-side
+mutation of the config singleton would have leaked one request's overrides into the next);
+`ready` waits for the bust mesh to be in the scene and a failed mesh load is reported as
+`error`; the WebGPU renderer is disposed on unmount (deferred by a tick so React StrictMode's
+dev double-mount keeps a live renderer); the `@/scene` barrel no longer re-exports the
+client-only canvas; the e2e fails on page errors and, on CI, waits for 30 scene frames.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
