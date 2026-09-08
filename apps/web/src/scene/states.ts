@@ -240,7 +240,21 @@ export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
     },
     { text: "STATUS: DORMANT", dot: "#0A3D7A", pulse: false },
   ),
-  IDLE: baseSpec("IDLE"),
+  // IDLE — after a turn, or recovery: "warm but resting" (Ali: dim amber, core ×0.45, 6 s breath)
+  IDLE: delta(
+    "#C97F3A",
+    {
+      coreIntensity: 0.45,
+      corePulsePeriod: 4,
+      ringBreathPeriod: 6,
+      plumeFraction: 0.6,
+      plumeSpeed: 0.7,
+      neckPulseSpeed: 0.5,
+      contourScroll: 0.5,
+      goldBrightness: 0.8,
+    },
+    { text: "STATUS: IDLE", dot: sceneConfig.palette.line, pulse: false },
+  ),
   WAKING: baseSpec("WAKING"),
   // the identity row: `sceneConfig.hud.text` is the LISTENING readout the scene shipped with
   LISTENING: {
