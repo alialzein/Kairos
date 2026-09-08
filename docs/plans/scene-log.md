@@ -466,6 +466,37 @@ p95 1.1 ms; at dpr 1.5: p50 1.2 ms / p95 1.4 ms** — far under Ali's 12 ms bar,
 13.3 counts stay. (This Chrome session's rAF is capped at 60 Hz; with vsync on every
 measurement reads 16.7 ms regardless of content.)
 
+## Phase 14 (Ali, 2026-09-08) — bust interior, last look round
+
+Still on PR #30; Ali gives the merge after 14.2. One commit + screenshot per item,
+`docs/screens/phase-14/`. Particle density is approved at the scale of the Phase 13.3
+screenshot (desktop counts, scale 1): locked as the default (`particles.countScale`), and the
+bench's `?set=` overrides no longer apply in production builds.
+
+1. **14.1 Selective bloom.** `14-1.png`. Ali wrote it in pmndrs terms (Selection/Select +
+   SelectiveBloom), which cannot run on the WebGPU renderer (GLSL passes; CLAUDE.md §4). The
+   equivalent with three's MRT: the scene pass gets a second half-float attachment `bloomSrc`
+   that every material fills with its colour by default (a material's `mrtNode` merges with the
+   pass's — NodeMaterial.js:572 / MRTNode.js:151); the bust contour material writes black into
+   it and `bloom()` reads that attachment with the same strength/radius/threshold. One finding
+   from the sources: extra MRT attachments default to NO blending per target
+   (WebGPUPipelineUtils.js:147, WebGLState.js:297), so without an explicit
+   `setBlendMode("bloomSrc", MaterialBlending)` every additive sprite would have overwritten the
+   bloom source instead of adding into it. `post.selectiveBloom` toggles the whole path. Gaps
+   between the contour lines are dark navy on the head sides, neck and shoulders; the glow
+   comes from the outline, core and neck. WebGL2 fallback renders it too.
+
+2. **14.2 Line texture.** `14-2.png`. Contour frequency "90 → 75" in the plan's units: the
+   plan's 90 is this config's 45 (Phase 3 note), so the same ratio, 45 → 37.5; bead floor
+   0.35 → 0.6; shell base alpha 0.03 → 0. Crisp fine lines, dark between them, the silhouette
+   still particle-lit.
+
+Density lock: the approved counts are `particles.countScale` 1, applied by `sceneCount` and
+`pointBudget` before the mobile halving (`scaledCount`); the bench's `?set=` overrides are
+ignored in production builds (`NODE_ENV`), the layer params stay for CI's smoke and the
+fallback probe. Frame time at that scale, 1920 × 1080, dpr 1, vsync off: **p50 0.8 ms**,
+p95 1.1 ms. Desktop budget unchanged at 228,241 sprites.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
