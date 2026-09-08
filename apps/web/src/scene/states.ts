@@ -297,7 +297,26 @@ export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
     ...baseSpec("LISTENING"),
     hud: { text: sceneConfig.hud.text, dot: sceneConfig.palette.line, pulse: true },
   },
-  THINKING: baseSpec("THINKING"),
+  // THINKING — a turn is being worked on: amber core throbbing at 1.2 s, signals running to
+  // the nucleus, faster breath / scroll / drift
+  THINKING: delta(
+    "#FFB347",
+    {
+      coreIntensity: 1.3,
+      corePulsePeriod: 1.2,
+      corePulseAmount: 2,
+      ringBreathAmount: 1.5,
+      ringBreathPeriod: 3,
+      plumeSpeed: 1.5,
+      neckPulseSpeed: 3,
+      neckBrightness: 1.3,
+      contourScroll: 2,
+      goldBrightness: 1.2,
+      dustDrift: 1.5,
+    },
+    { text: "STATUS: THINKING", dot: "#FFB347", pulse: true },
+    { inMs: 500 },
+  ),
   SPEAKING: baseSpec("SPEAKING"),
   OFFLINE: baseSpec("OFFLINE"),
 };
