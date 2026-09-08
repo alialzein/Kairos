@@ -565,11 +565,13 @@ export const sceneConfig: SceneConfig = {
       push: [0.01, 0.04],
       size: [0.005, 0.0125],
       alphaMin: 0.03,
-      alphaRim: 0.9,
+      // Phase 13.1 (Ali): rim alpha 0.9 → 1.0 — the outline glow comes from the particles
+      alphaRim: 1.0,
       opacity: 1,
       seed: 13,
     },
-    halo: { scale: 1.015, color: "#9BE9FF", alpha: 0.9, fresnelPower: 2 },
+    // Phase 13.1 (Ali): halo alpha 0.9 → 0.45 — the halo mesh backs the particle outline, not the reverse
+    halo: { scale: 1.015, color: "#9BE9FF", alpha: 0.45, fresnelPower: 2 },
     headCenter: [0, 1.45, 0],
     headRadius: 0.5,
     headScaleY: 1.2,
@@ -589,12 +591,15 @@ export const sceneConfig: SceneConfig = {
   // Phase 11.2 (Ali): lineWidth 0.05 → 0.04 with the darker `palette.fill` — the lines must be
   // visibly separated by dark, not merge into one teal block.
   // Phase 12.1 (Ali): lineBoost 0 → 0.4 (multiplier 1.4) — see the key's comment.
+  // Phase 13.1 (Ali): the bust read as a solid bright block — lineBoost back to 0 (multiplier
+  // 1.0, on the bust only; particle brightnesses stay) and lineWidth 0.04 → 0.03 so the interior
+  // is dark navy between the lines again.
   contours: {
     frequency: 45,
-    lineWidth: 0.04,
+    lineWidth: 0.03,
     fresnelPower: 2.5,
     rimStrength: 0.9,
-    lineBoost: 0.4,
+    lineBoost: 0,
     scrollSpeed: 0.05,
     beads: { enabled: true, frequency: 140, min: 0.35 },
   },
@@ -609,7 +614,9 @@ export const sceneConfig: SceneConfig = {
     pulseSpeed: 1.5,
     pulseAmount: 0.15,
     glow: { size: 0.9, z: 0.72, alpha: 0.9, brightness: 1.5, scalePulse: 0.5 },
-    hot: { radius: 0.4 },
+    // Phase 13.1 (Ali): white-hot mix 40 % → 25 % of the core radius — the centre reads
+    // gold-orange, not yellow-white
+    hot: { radius: 0.25 },
   },
 
   // plan: jawY 1.02 / controlY 0.75 / nodeY 0.42 for the sphere-head bust. On the mesh the chin

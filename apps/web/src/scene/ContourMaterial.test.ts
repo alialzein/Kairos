@@ -32,7 +32,7 @@ describe("createContourUniforms — hot core", () => {
   it("exposes the hot radius fraction and the hot colour", () => {
     const u = createContourUniforms(sceneConfig);
     expect(u.coreRadius.value).toBe(0.5);
-    expect(u.hotRadius.value).toBe(0.4);
+    expect(u.hotRadius.value).toBe(sceneConfig.core.hot.radius);
     const hot = new Color(sceneConfig.palette.coreHot);
     expect(u.hotColor.value).toEqual(new Vector3(hot.r, hot.g, hot.b));
   });
