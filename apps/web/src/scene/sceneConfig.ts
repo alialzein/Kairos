@@ -69,7 +69,13 @@ export interface SceneConfig {
   };
   /** Phase 10 (Ali): every point layer shares one soft sprite; the spec's point sizes are
    *  starting values ("keep the ratios, tune the scale") — this multiplies all of them */
-  particles: { sizeScale: number };
+  particles: {
+    sizeScale: number;
+    /** Phase 14 (Ali): particle density approved at the Phase 13.3 screenshot's scale — locked
+     *  here as the default; every sprite count passes through `sceneCount` × this (then the
+     *  mobile halving). 1 = the approved desktop counts. */
+    countScale: number;
+  };
   palette: {
     bgTop: string;
     bgBottom: string;
@@ -525,7 +531,7 @@ export const sceneConfig: SceneConfig = {
   // Ali's starting sizes (landscape nodes 0.03–0.07) were ~2 px at this depth: edges dominated.
   // ×3 made the nodes the hero (docs/screens/phase-10/10-1.png); ratios unchanged.
   // Phase 11.1 (Ali): 3 → 1.5 — "density makes the glow, not point size".
-  particles: { sizeScale: 1.5 },
+  particles: { sizeScale: 1.5, countScale: 1 },
 
   palette: {
     bgTop: "#020B1F",
@@ -578,7 +584,7 @@ export const sceneConfig: SceneConfig = {
       count: 120000,
       push: [0.01, 0.04],
       size: [0.005, 0.0125],
-      alphaMin: 0.03,
+      alphaMin: 0, // Phase 14.2 (Ali): 0.03 → 0 — no particles on the front of the face
       // Phase 13.1 (Ali): rim alpha 0.9 → 1.0 — the outline glow comes from the particles
       alphaRim: 1.0,
       opacity: 1,
@@ -609,13 +615,16 @@ export const sceneConfig: SceneConfig = {
   // 1.0, on the bust only; particle brightnesses stay) and lineWidth 0.04 → 0.03 so the interior
   // is dark navy between the lines again.
   contours: {
-    frequency: 45,
+    // Phase 14.2 (Ali): "frequency 90 → 75" in the plan's units — the plan's 90 is this file's
+    // 45 (see above), so the same ratio: 45 → 37.5, more dark between the lines
+    frequency: 37.5,
     lineWidth: 0.03,
     fresnelPower: 2.5,
     rimStrength: 0.9,
     lineBoost: 0,
     scrollSpeed: 0.05,
-    beads: { enabled: true, frequency: 140, min: 0.35 },
+    // Phase 14.2 (Ali): bead floor 0.35 → 0.6 — fine lines with a particle texture, not dashes
+    beads: { enabled: true, frequency: 140, min: 0.6 },
   },
 
   // plan: [0, 1.5, 0.45] for the sphere head; the mesh's face (eyes y ≈ 1.35, mouth ≈ 1.08)

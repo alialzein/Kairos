@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { dprFor, landscapeCols, mobileCount, motionEnabled, pointBudget } from "./motion";
+import {
+  dprFor,
+  landscapeCols,
+  mobileCount,
+  motionEnabled,
+  pointBudget,
+  scaledCount,
+} from "./motion";
 import { sceneConfig, type SceneConfig } from "./sceneConfig";
 
 const perf: SceneConfig["perf"] = {
@@ -69,6 +76,22 @@ describe("pointBudget (Phase 12.7)", () => {
     // `cols + 1` grid on both sides (2 · rows extra nodes) and the nucleus/core round up
     const slack = 2 * sceneConfig.landscape.rows + 4;
     expect(Math.abs(mobile.total - desktop.total / 2)).toBeLessThanOrEqual(slack);
+  });
+  it("scales every sprite count by particles.countScale (Phase 14: locked at 1)", () => {
+    expect(sceneConfig.particles.countScale).toBe(1);
+    expect(scaledCount(1000, 1)).toBe(1000);
+    expect(scaledCount(1000, 0.5)).toBe(500);
+    expect(scaledCount(301, 0.5)).toBe(151);
+    const full = pointBudget(sceneConfig, 1440);
+    const half = pointBudget(
+      { ...sceneConfig, particles: { ...sceneConfig.particles, countScale: 0.5 } },
+      1440,
+    );
+    // the landscape grid is a dimension, not a sprite count: it does not scale, the rest halves
+    const grid = 2 * (sceneConfig.landscape.cols + 1) * sceneConfig.landscape.rows;
+    expect(half.total - grid).toBeLessThanOrEqual((full.total - grid) / 2 + 4);
+    expect(half.total - grid).toBeGreaterThanOrEqual((full.total - grid) / 2 - 4);
+    expect(half.shell).toBe(sceneConfig.bust.shell.count / 2);
   });
   it("counts each layer the way the layer builds it", () => {
     const b = pointBudget(sceneConfig, 1440);

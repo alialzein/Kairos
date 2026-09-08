@@ -8,8 +8,8 @@ import { sceneConfig } from "./sceneConfig";
 describe("createContourUniforms — beads", () => {
   it("exposes the configured bead frequency and floor, enabled by default", () => {
     const u = createContourUniforms(sceneConfig);
-    expect(u.beadFrequency.value).toBe(140);
-    expect(u.beadMin.value).toBe(0.35);
+    expect(u.beadFrequency.value).toBe(sceneConfig.contours.beads.frequency);
+    expect(u.beadMin.value).toBe(sceneConfig.contours.beads.min);
     expect(u.beadOn.value).toBe(1);
   });
 

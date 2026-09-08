@@ -44,8 +44,15 @@ export function landscapeCols(width: number, cols: number, perf: SceneConfig["pe
  *  generator as an override (`{ ...cfg, count: sceneCount(cfg.count) }`), never by mutating
  *  `sceneConfig`. Read once at build time, like `sceneMotionEnabled`. */
 export function sceneCount(count: number): number {
-  if (typeof window === "undefined") return count;
-  return mobileCount(window.innerWidth, count, sceneConfig.perf);
+  const scaled = scaledCount(count, sceneConfig.particles.countScale);
+  if (typeof window === "undefined") return scaled;
+  return mobileCount(window.innerWidth, scaled, sceneConfig.perf);
+}
+
+/** A sprite count × `particles.countScale` (Phase 14: the approved density, locked at 1),
+ *  applied before the mobile halving. Pure. */
+export function scaledCount(count: number, countScale: number): number {
+  return Math.round(count * countScale);
 }
 
 /** Sprites this config draws at a given viewport width, per layer and in total — the Phase 12
@@ -72,7 +79,9 @@ export function pointBudget(
   stars: number;
   total: number;
 } {
-  const n = (count: number) => mobileCount(width, count, cfg.perf);
+  // every sprite count: × countScale (Phase 14), then the mobile factor — as `sceneCount` does
+  const n = (count: number) =>
+    mobileCount(width, scaledCount(count, cfg.particles.countScale), cfg.perf);
   const l = cfg.landscape;
   const cols = landscapeCols(width, l.cols, cfg.perf);
   const landscape = 2 * ((cols + 1) * l.rows + n(l.dust.count) + n(l.crest.dust.count));
