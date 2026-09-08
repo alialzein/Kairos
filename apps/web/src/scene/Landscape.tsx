@@ -26,10 +26,13 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  * gold peaks) — all additive with depth writes off. The seeded ridge noise is the repo's simplex
  * (sim/noise.ts, noise2D(x, y) = noise3(x, y, 0)) instead of the simplex-noise package, so no new
  * dependency. Static: no per-frame work. Phase 11.1 (Ali) was a density pass on the generator
- * alone; Phase 12.2 (Ali) adds the ridge lines — 12,060 nodes per side, and the generator's crest
- * (the top 15 % of every column) carries a per-node / per-endpoint COLOUR multiplier, so the
- * skyline draws bigger and brighter than 1 and feeds bloom on the half-float buffer (Phase 12.1)
- * while the slope stays a dim haze. Opacity is never used for emphasis: it cannot exceed 1.
+ * alone; Phase 12.2 (Ali) adds the ridge lines — the generator's crest (the top 15 % of every
+ * column) carries a per-node / per-endpoint COLOUR multiplier, so the skyline draws bigger and
+ * brighter than 1 and feeds bloom on the half-float buffer (Phase 12.1) while the slope stays a
+ * dim haze. Opacity is never used for emphasis: it cannot exceed 1. Phase 13.2 (Ali) shifts the
+ * weight onto the particles: 16,170 nodes per side, edges down to 5 % opacity, and 15,000 slope
+ * dust points per side at per-point sizes, drawn toward the crests — glowing particulate terrain
+ * rather than a net, with the ridge lines still the brightest thing on each side.
  */
 export function Landscape() {
   const scene = useThree((s) => s.scene);
@@ -126,9 +129,12 @@ export function Landscape() {
       opacities: mesh.goldNodeFade,
       brightness: mesh.goldNodeBrightness,
     });
+    // Phase 13.2: the slope dust is the layer's particle mass — 15,000 points per side at a
+    // per-point size, so it shares the nodes' unit conversion and `mesh.dustSizes` does the rest
     const dust = createPointSprites({
       points: mesh.dust,
-      size: spriteSizeForPointSize(l.dust.size * particles.sizeScale, currentVerticalFov()),
+      size: unit,
+      sizes: mesh.dustSizes,
       color: palette.landscape,
       opacity: l.dust.opacity,
       opacities: mesh.dustFade,

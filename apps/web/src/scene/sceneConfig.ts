@@ -356,7 +356,7 @@ export interface SceneConfig {
     xEnd: number;
     /** number of x intervals per side: cols + 1 points, x reaching xEnd (plan `0..cols`) */
     cols: number;
-    /** exact row count (Phase 12.2: 60 rows, z from zStart back by zStep) */
+    /** exact row count (Phase 13.2: 70 rows, z from zStart back by zStep) */
     rows: number;
     zStart: number;
     zStep: number;
@@ -414,9 +414,13 @@ export interface SceneConfig {
      *  `crest.sizeFactor` — every gold node is a crest node */
     goldSizeFactor: number;
     goldOpacity: number;
-    /** Phase 11.1 (Ali): surface dust — tiny unconnected points per side, each within `radius`
-     *  of a node picked uniformly at random (not by height: it is surface dust, not ridge dust) */
-    dust: { count: number; size: number; opacity: number; radius: number };
+    /** Phase 11.1 (Ali): slope dust — tiny unconnected points per side, each within `radius` of
+     *  an anchor node. Phase 13.2 (Ali) turned the slopes into particle mass: the count is the
+     *  layer's biggest, `size` is a per-point uniform range (PointsMaterial units, like
+     *  `nodeSize`) instead of one shared size, and the anchor is no longer picked uniformly — it
+     *  is drawn with probability ∝ its normalised height (y − minY)/(maxY − minY) over that
+     *  side's nodes, so the mass gathers under the crests and thins out down the slope. */
+    dust: { count: number; size: [number, number]; opacity: number; radius: number };
     /** simplex noise seed for the ridges and rng seed for the jitter, sizes, k, gold and the two
      *  dust passes */
     noiseSeed: number;
@@ -756,11 +760,13 @@ export const sceneConfig: SceneConfig = {
   landscape: {
     xStart: 1.2,
     xEnd: 4.0,
-    cols: 200,
-    rows: 60,
+    cols: 230,
+    rows: 70,
     zStart: -0.5,
-    // 13·0.35/59: rows 40 → 60 over the same z range, far row at z ≈ −5.05 as in round 3
-    zStep: -0.0771,
+    // −13·0.35/69: rows 60 → 70 over the same z range, far row at z ≈ −5.05 as in round 3.
+    // Phase 13.2 (Ali): 16,000 nodes per side — (230 + 1) × 70 = 16,170, and the z step shrinks
+    // with the row count so the range the rows cover is exactly the one round 3 framed.
+    zStep: -0.06594,
     // round 3: a heightfield sloping down toward the viewer; peaks around neck height
     // Phase 11.1: base at the frame's bottom edge (y ≈ −0.86 at the near row) so the slope fills
     // each side from the bottom up; at −1.2 the near 30 rows sat under the fade window
@@ -775,7 +781,8 @@ export const sceneConfig: SceneConfig = {
     maxEdge: 0.12,
     nodeSize: [0.015, 0.035],
     nodeOpacity: 0.9,
-    edgeOpacity: 0.1,
+    // Phase 13.2 (Ali): 0.10 → 0.05 — the edges are hints under the particle mass now
+    edgeOpacity: 0.05,
     crest: {
       ratio: 0.15,
       sizeFactor: 1.6,
@@ -785,7 +792,8 @@ export const sceneConfig: SceneConfig = {
     },
     goldSizeFactor: 1.5,
     goldOpacity: 0.8,
-    dust: { count: 4000, size: 0.01, opacity: 0.4, radius: 0.25 },
+    // Phase 13.2 (Ali): 4,000 → 15,000 per side, per-point size range, alpha 0.4 → 0.35
+    dust: { count: 15000, size: [0.008, 0.015], opacity: 0.35, radius: 0.25 },
     noiseSeed: 7,
     seed: 11,
   },

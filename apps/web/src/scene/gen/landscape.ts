@@ -18,9 +18,11 @@ export interface LandscapeMesh {
   goldNodeFade: Float32Array;
   /** per gold node: always `crest.brightness` — every gold node is a crest node */
   goldNodeBrightness: Float32Array;
-  /** unconnected surface dust: `dust.count` per side near the surface, xyz */
+  /** unconnected slope dust: `dust.count` per side near the surface, xyz */
   dust: Float32Array;
   dustFade: Float32Array;
+  /** per dust point: PointsMaterial size, drawn uniformly in `dust.size` (Phase 13.2) */
+  dustSizes: Float32Array;
   /** ridge dust: `crest.dust.count` gold points per side within `crest.dust.radius` of a crest node */
   goldDust: Float32Array;
   goldDustFade: Float32Array;
@@ -45,6 +47,9 @@ export interface LandscapeMesh {
   blueCount: number;
   goldCount: number;
 }
+
+/** Phase 13.2: the floor under the height weight, so the lowest nodes still get some dust */
+const DUST_HEIGHT_EPSILON = 1e-3;
 
 const smoothstep = (e0: number, e1: number, x: number): number => {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
@@ -89,9 +94,21 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
  * therefore sits on the skyline, and its size factor stacks on the crest's. Finally
  * `crest.dust.count` gold points per side sit within `crest.dust.radius` of a crest node.
  *
+ * Phase 13.2 (Ali): the slopes become the particle mass. Edges drop to `edgeOpacity` 0.05 (hints
+ * under the mass), the grid grows to (230 + 1) × 70 = 16,170 nodes per side, and `dust.count`
+ * rises to 15,000 per side with a per-point size drawn uniformly in `dust.size` instead of one
+ * shared grain size. The dust anchor is no longer uniform: it is drawn with probability ∝ that
+ * node's normalised height (y − minY)/(maxY − minY) over its own side, so the mass gathers under
+ * the crests and thins down the slope. A node at minY would then have weight 0 and the lowest row
+ * would be strictly empty, so every weight carries `DUST_HEIGHT_EPSILON`; on a flat field (span 0)
+ * the epsilon is all there is and the draw degenerates to uniform, which is the intent. Sampling
+ * is WITH replacement — prefix sums over the side once, then one binary search per point, O(log n)
+ * a draw — so 15,000 points cost nothing next to the neighbour search. Crest gold is untouched.
+ *
  * rng order, unchanged in shape and load-bearing for determinism: per node jx, jz, size; then k
- * per node; then the gold draw over the crest list; then, per dust point, the node pick and its
- * radius/cosθ/φ offset; then the same three draws per gold dust point over the crest list.
+ * per node; then the gold draw over the crest list; then, per dust point, the node pick, its
+ * radius/cosθ/φ offset and (Phase 13.2) its size; then the same three draws per gold dust point
+ * over the crest list.
  */
 export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rng): LandscapeMesh {
   const cols = l.cols + 1;
@@ -296,17 +313,44 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     targetBright[at * 2 + 1] = bright;
   });
 
-  // dust: per side, a node picked uniformly at random (Phase 11.1 — it is surface dust, so it
-  // follows the surface everywhere, not just the ridge tops) plus a uniform offset inside a ball
-  // of radius `dust.radius`; it carries that node's fade
+  // Phase 13.2 dust: per side, an anchor node drawn WITH replacement at probability ∝ its
+  // normalised height + DUST_HEIGHT_EPSILON (so the mass gathers under the crests without leaving
+  // the lowest rows strictly empty, and a flat side falls back to a uniform draw), plus a uniform
+  // offset inside a ball of radius `dust.radius`; it carries that anchor's fade and its own size.
+  // One prefix-sum pass per side, then a binary search per point — O(log n) a draw.
   const dustCount = 2 * l.dust.count;
   const dust = new Float32Array(dustCount * 3);
   const dustFade = new Float32Array(dustCount);
+  const dustSizes = new Float32Array(dustCount);
   let s = 0;
   for (let side = 0; side < 2; side++) {
     const lo = side * perSide;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let p = lo; p < lo + perSide; p++) {
+      const y = pos[p * 3 + 1] ?? 0;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const span = maxY - minY;
+    const cdf = new Float64Array(perSide);
+    let acc = 0;
+    for (let n = 0; n < perSide; n++) {
+      const y = pos[(lo + n) * 3 + 1] ?? 0;
+      acc += (span > 0 ? (y - minY) / span : 1) + DUST_HEIGHT_EPSILON;
+      cdf[n] = acc;
+    }
     for (let n = 0; n < l.dust.count; n++) {
-      const pick = lo + Math.min(perSide - 1, Math.floor(rng() * perSide));
+      // the first prefix sum strictly above u — the standard inverse-CDF draw
+      const u = rng() * acc;
+      let a = 0;
+      let b = perSide - 1;
+      while (a < b) {
+        const mid = (a + b) >> 1;
+        if ((cdf[mid] ?? 0) > u) b = mid;
+        else a = mid + 1;
+      }
+      const pick = lo + a;
       const radius = l.dust.radius * Math.cbrt(rng());
       const cosT = 2 * rng() - 1;
       const sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
@@ -315,6 +359,7 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
       dust[s * 3 + 1] = (pos[pick * 3 + 1] ?? 0) + radius * sinT * Math.sin(phi);
       dust[s * 3 + 2] = (pos[pick * 3 + 2] ?? 0) + radius * cosT;
       dustFade[s] = fade[pick] ?? 0;
+      dustSizes[s] = l.dust.size[0] + rng() * (l.dust.size[1] - l.dust.size[0]);
       s++;
     }
   }
@@ -353,6 +398,7 @@ export function landscape(l: SceneConfig["landscape"], noise2D: Noise2D, rng: Rn
     goldNodeBrightness,
     dust,
     dustFade,
+    dustSizes,
     goldDust,
     goldDustFade,
     blue,

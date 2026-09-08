@@ -20,10 +20,11 @@ const xyz = (a: Float32Array, i: number): [number, number, number] => [
 const key = (p: [number, number, number]) => p.join(",");
 const meanY = (ps: [number, number, number][]) => ps.reduce((s, p) => s + p[1], 0) / ps.length;
 
-// Phase 12.2 (Ali): the shipped grid is (200 + 1) × 60 = 12,060 nodes per side. The per-node
-// assertions below are O(n²) (nearest-neighbour reachability, dust containment), so they run on a
-// reduced 61 × 12 grid with 400 dust and 200 gold dust per side; the shipped config is covered by
-// the counts, the uniform dust pick and the generation-time guard in the last test.
+// Phase 13.2 (Ali): the shipped grid is (230 + 1) × 70 = 16,170 nodes per side, with 15,000 slope
+// dust points per side. The per-node assertions below are O(n²) (nearest-neighbour reachability,
+// dust containment), so they run on a reduced 61 × 12 grid with 400 dust and 200 gold dust per
+// side; the shipped config is covered by the counts, the height-biased dust pick and the
+// generation-time guard in the last test.
 const small: typeof cfg = {
   ...cfg,
   cols: 60,
@@ -32,7 +33,7 @@ const small: typeof cfg = {
   crest: { ...cfg.crest, dust: { ...cfg.crest.dust, count: 200 } },
 };
 
-describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines)", () => {
+describe("landscape (Phase 13.2: glowing particulate slopes under bright ridge lines)", () => {
   const m = landscape(small, noise2D, mulberry32(2));
   const perSide = (small.cols + 1) * small.rows;
   const total = 2 * perSide;
@@ -364,6 +365,14 @@ describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines
     expect(m.dustCount).toBe(2 * small.dust.count);
     expect(m.dust.length).toBe(m.dustCount * 3);
     expect(m.dustFade.length).toBe(m.dustCount);
+    // Phase 13.2: one size per point, drawn uniformly in `dust.size` (the sprite gets the same
+    // unit conversion as the nodes and these do the rest), so the mass is not one flat grain
+    expect(m.dustSizes.length).toBe(m.dustCount);
+    for (let i = 0; i < m.dustCount; i++) {
+      expect(m.dustSizes[i]).toBeGreaterThanOrEqual(small.dust.size[0]);
+      expect(m.dustSizes[i]).toBeLessThanOrEqual(small.dust.size[1]);
+    }
+    expect(new Set(Array.from(m.dustSizes)).size).toBeGreaterThan(100);
     const r = small.dust.radius;
     // each point sits inside dust.radius of a node and carries that node's fade (not its own y)
     for (let i = 0; i < m.dustCount; i++) {
@@ -378,6 +387,69 @@ describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines
     // both sides get points
     expect(m.dust.filter((_, i) => i % 3 === 0).some((x) => x < 0)).toBe(true);
     expect(m.dust.filter((_, i) => i % 3 === 0).some((x) => x > 0)).toBe(true);
+  });
+
+  it("draws the dust anchor with probability proportional to node height, uniform on a flat field", () => {
+    // Phase 13.2 (Ali): "density biased toward the crests". Zero jitter and few columns, so a
+    // dust point's anchor is recoverable as its nearest node, and the shipped row count so the
+    // heightfield spans its real range.
+    const bias: typeof cfg = {
+      ...cfg,
+      cols: 20,
+      jitter: 0,
+      dust: { ...cfg.dust, count: 600 },
+      crest: { ...cfg.crest, dust: { ...cfg.crest.dust, count: 10 } },
+    };
+    const anchors = (l: typeof cfg, noise: (x: number, y: number) => number, seed: number) => {
+      const b = landscape(l, noise, mulberry32(seed));
+      const ns: [number, number, number][] = [];
+      for (let i = 0; i < b.nodeCount; i++) ns.push(xyz(b.nodes, i));
+      for (let i = 0; i < b.goldNodeCount; i++) ns.push(xyz(b.goldNodes, i));
+      const picked: [number, number, number][] = [];
+      for (let i = 0; i < b.dustCount; i++) {
+        const p = xyz(b.dust, i);
+        let best = 0;
+        let bestD = Infinity;
+        ns.forEach((n, j) => {
+          const d = (n[0] - p[0]) ** 2 + (n[1] - p[1]) ** 2 + (n[2] - p[2]) ** 2;
+          if (d < bestD) {
+            bestD = d;
+            best = j;
+          }
+        });
+        picked.push(ns[best] ?? [0, 0, 0]);
+      }
+      return { nodes: ns, picked, count: b.dustCount };
+    };
+
+    const real = anchors(bias, noise2D, 5);
+    // the two height halves of the surface = the higher and lower half of the nodes by y
+    const ys = real.nodes.map((n) => n[1]);
+    const median = [...ys].sort((a, b) => a - b)[ys.length >> 1] ?? 0;
+    const topDust = real.picked.filter((p) => p[1] > median).length / real.count;
+    const midY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    console.log(
+      `[landscape 13.2] height bias: the higher half of the nodes holds ` +
+        `${(topDust * 100).toFixed(1)} % of the dust; the top half of the height *range* holds ` +
+        `${((real.picked.filter((p) => p[1] > midY).length / real.count) * 100).toFixed(1)} % ` +
+        `of the dust against ${((ys.filter((y) => y > midY).length / ys.length) * 100).toFixed(1)} ` +
+        `% of the nodes`,
+    );
+    expect(topDust).toBeGreaterThan(0.6);
+
+    // a flat heightfield (no slope, no amplitude → every y is baseY) has a zero height span, so
+    // the epsilon floor is all that is left and the pick falls back to uniform: the far half of
+    // the rows gets its share and no more
+    const flatCfg: typeof cfg = { ...bias, slope: 0, amplitude: 0 };
+    const flat = anchors(flatCfg, noise2D, 5);
+    expect(new Set(flat.nodes.map((n) => n[1])).size).toBe(1);
+    const zMid = flatCfg.zStart + ((flatCfg.rows - 1) / 2) * flatCfg.zStep;
+    const far = flat.picked.filter((p) => p[2] < zMid).length / flat.count;
+    console.log(
+      `[landscape 13.2] flat field: far half of the rows holds ${(far * 100).toFixed(1)} % of the dust`,
+    );
+    expect(far).toBeGreaterThan(0.45);
+    expect(far).toBeLessThan(0.55);
   });
 
   it("scatters crest.dust.count gold points per side inside crest.dust.radius of a crest node", () => {
@@ -416,6 +488,7 @@ describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines
       "goldNodeBrightness",
       "dust",
       "dustFade",
+      "dustSizes",
       "goldDust",
       "goldDustFade",
       "blue",
@@ -429,20 +502,23 @@ describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines
     }
   });
 
-  it("builds the shipped 201 × 60 grid quickly, with dust picked uniformly over the surface", () => {
+  it("builds the shipped 231 × 70 grid quickly, with the dust mass biased toward the crests", () => {
     const t0 = performance.now();
     const full = landscape(cfg, noise2D, mulberry32(2));
     const ms = performance.now() - t0;
     const fullTotal = 2 * (cfg.cols + 1) * cfg.rows;
     const fullCrest = 2 * (cfg.cols + 1) * Math.round(cfg.rows * cfg.crest.ratio);
     expect(full.nodeCount + full.goldNodeCount).toBe(fullTotal);
-    expect(fullTotal).toBeGreaterThanOrEqual(24000); // Ali: 12,000 nodes per side
+    expect(fullTotal).toBeGreaterThanOrEqual(32000); // Phase 13.2 (Ali): 16,000 nodes per side
     expect(full.crestCount).toBe(fullCrest);
     expect(full.goldNodeCount).toBe(Math.round(fullCrest * cfg.crest.goldShare));
     expect(full.dustCount).toBe(2 * cfg.dust.count);
+    expect(full.dustSizes.length).toBe(full.dustCount);
     expect(full.goldDustCount).toBe(2 * cfg.crest.dust.count);
+    expect(full.dustCount).toBeGreaterThanOrEqual(30000); // Ali: 15,000 per side
 
-    // dust picks its node uniformly, not by height²: its mean height matches the surface's
+    // Phase 13.2: the dust anchor is drawn ∝ height, so the mass sits above the surface mean —
+    // but below the gold dust, which rides the crest itself
     const ys: number[] = [];
     for (let i = 0; i < full.nodeCount; i++) ys.push(full.nodes[i * 3 + 1] ?? 0);
     for (let i = 0; i < full.goldNodeCount; i++) ys.push(full.goldNodes[i * 3 + 1] ?? 0);
@@ -450,12 +526,22 @@ describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines
     let dustMean = 0;
     for (let i = 0; i < full.dustCount; i++) dustMean += full.dust[i * 3 + 1] ?? 0;
     dustMean /= full.dustCount;
-    expect(Math.abs(dustMean - nodeMean)).toBeLessThan(0.1);
-    // the gold dust rides the crest, so it sits well above the surface mean
+    expect(dustMean).toBeGreaterThan(nodeMean + 0.2);
+    // the gold dust rides the crest, so it sits above the height-biased dust as well
     let goldDustMean = 0;
     for (let i = 0; i < full.goldDustCount; i++) goldDustMean += full.goldDust[i * 3 + 1] ?? 0;
     goldDustMean /= full.goldDustCount;
-    expect(goldDustMean).toBeGreaterThan(nodeMean + 0.2);
+    expect(goldDustMean).toBeGreaterThan(dustMean);
+    // the per-point sizes cover the configured range
+    let sMin = Infinity;
+    let sMax = -Infinity;
+    for (let i = 0; i < full.dustCount; i++) {
+      const v = full.dustSizes[i] ?? 0;
+      if (v < sMin) sMin = v;
+      if (v > sMax) sMax = v;
+    }
+    expect(sMin).toBeGreaterThanOrEqual(cfg.dust.size[0]);
+    expect(sMax).toBeLessThanOrEqual(cfg.dust.size[1]);
 
     // the counts Ali asked for, plus the shape of the network
     const index = new Map<string, number>();
@@ -490,17 +576,19 @@ describe("landscape (Phase 12.2: a dense plexus network with glowing ridge lines
     const fading = ys.filter((y) => y > cfg.fade[0] && y < cfg.fade[1]).length / ys.length;
     const dark = ys.filter((y) => y <= cfg.fade[0]).length / ys.length;
     console.log(
-      `[landscape 12.2] lit ${lit.toFixed(3)} · fading ${fading.toFixed(3)} · dark ${dark.toFixed(3)}`,
+      `[landscape 13.2] lit ${lit.toFixed(3)} · fading ${fading.toFixed(3)} · dark ${dark.toFixed(3)}`,
     );
     expect(lit).toBeGreaterThan(0.25);
     expect(fading).toBeGreaterThan(0.05);
     expect(dark).toBe(0);
     console.log(
-      `[landscape 12.2] ${ms.toFixed(0)} ms · nodes ${fullTotal} (blue ${full.nodeCount}, gold ` +
+      `[landscape 13.2] ${ms.toFixed(0)} ms · nodes ${fullTotal} (blue ${full.nodeCount}, gold ` +
         `${full.goldNodeCount}, crest ${full.crestCount}) · edges ${edgeTotal} (blue ` +
         `${full.blueCount}, gold ${full.goldCount}, crest ${crestEdges}) · dust ` +
-        `${full.dustCount} · gold dust ${full.goldDustCount} · max edge ${maxLen.toFixed(4)} · ` +
-        `mean degree ${((2 * edgeTotal) / fullTotal).toFixed(2)} · isolated ${isolated}`,
+        `${full.dustCount} (size ${sMin.toFixed(4)}–${sMax.toFixed(4)}, mean y ` +
+        `${dustMean.toFixed(3)} vs surface ${nodeMean.toFixed(3)}) · gold dust ` +
+        `${full.goldDustCount} · max edge ${maxLen.toFixed(4)} · mean degree ` +
+        `${((2 * edgeTotal) / fullTotal).toFixed(2)} · isolated ${isolated}`,
     );
     expect(maxLen).toBeLessThanOrEqual(cfg.maxEdge + 1e-5);
     expect(isolated / fullTotal).toBeLessThan(0.01);
