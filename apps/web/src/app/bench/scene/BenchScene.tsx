@@ -36,7 +36,7 @@ export function BenchScene({
   query: LayerQuery;
   webgl: boolean;
   /** `?set=contours.frequency:40,...` tuning overrides applied to sceneConfig before mount
-   *  (`layers.*` is ignored — use `phase` / `only` / `off`) */
+   *  (`layers.*` is ignored — use `phase` / `only` / `off`); development builds only */
   set?: string;
 }) {
   // stable for the life of the page: the canvas parent must not re-render (ledger, Task 7)
@@ -45,8 +45,15 @@ export function BenchScene({
   // the BROWSER's copy once before the canvas mounts is exactly the plan's "apply the named
   // change, re-screenshot". Never on the server: this component is server-rendered too, and a
   // mutation there would leak one request's `?set=` into every later request.
+  // Phase 14 (Ali): the tuning overrides are a development tool — production builds ignore
+  // `?set=` so the approved config is the only one a visitor can see (NODE_ENV is inlined by
+  // Next at build time). The layer params (`phase` / `only` / `off` / `webgl`) stay: CI's smoke
+  // and the fallback probe use them.
   const applied = useMemo(
-    () => (typeof window === "undefined" ? [] : applyOverrides(sceneConfig, set)),
+    () =>
+      typeof window === "undefined" || process.env.NODE_ENV === "production"
+        ? []
+        : applyOverrides(sceneConfig, set),
     [set],
   );
   const frames = useRef(0);

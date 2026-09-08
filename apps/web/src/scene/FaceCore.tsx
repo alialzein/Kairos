@@ -16,6 +16,10 @@ import { colorVec3 } from "./tsl";
  * `core.pulseSpeed`: the opacity uses the contour shader's pulse expression (amplitude
  * `pulseAmount`), the scale swings by `pulseAmount · glow.scalePulse` around 1, so tint and glow
  * pulse together.
+ *
+ * Phase 12.4 (Ali): the sprite is 1.5× brighter. `glow.brightness` multiplies the *colour*, not
+ * the opacity — opacity is capped at 1, while the half-float scene buffer (Phase 12.1) carries a
+ * colour > 1 straight into bloom.
  */
 export function FaceCore() {
   const scene = useThree((s) => s.scene);
@@ -26,7 +30,7 @@ export function FaceCore() {
     // Phase 9: no breathing under reduced motion (a constant wave of 0)
     const wave = sin(time.mul(sceneMotionEnabled() ? core.pulseSpeed : 0));
     const pulse = float(oneMinus(core.pulseAmount)).add(float(core.pulseAmount).mul(wave));
-    material.colorNode = vec4(colorVec3(palette.core), 1);
+    material.colorNode = vec4(colorVec3(palette.core).mul(core.glow.brightness), 1);
     material.opacityNode = float(oneMinus(r)).clamp(0, 1).mul(core.glow.alpha).mul(pulse);
     material.scaleNode = float(core.glow.size).mul(
       float(1).add(float(core.pulseAmount * core.glow.scalePulse).mul(wave)),

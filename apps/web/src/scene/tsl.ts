@@ -1,10 +1,13 @@
 import {
+  cos,
   float,
   hash,
   instanceIndex,
   instancedArray,
   mix,
-  shapeCircle,
+  sin,
+  time,
+  uv,
   vec3,
   vec4,
 } from "three/tsl";
@@ -25,10 +28,21 @@ export function spriteSizeForPointSize(size: number, fovDeg: number): number {
   return size * Math.tan((fovDeg * Math.PI) / 360);
 }
 
+/**
+ * Phase 10 (Ali) shared sprite shape: a radial-gradient disc, white at the centre falling linearly
+ * to transparent at the edge — 1 − clamp(length(uv − 0.5)·2, 0, 1), the TSL equivalent of a 64 px
+ * canvas radial gradient. Softer than `shapeCircle()`, which is a hard-edged antialiased disc.
+ */
+export function softDisc() {
+  const r = uv().sub(0.5).length().mul(2).clamp(0, 1);
+  return float(1).sub(r);
+}
+
 export interface PointSpritesOptions {
   /** xyz per point */
   points: Float32Array;
-  /** world size (see spriteSizeForPointSize) */
+  /** world size (see spriteSizeForPointSize). With `sizes`, this is the unit conversion factor:
+   *  the final world size is size · sizes[i] · sizeJitter */
   size: number;
   color: string;
   opacity: number;
@@ -37,11 +51,26 @@ export interface PointSpritesOptions {
   /** per-sprite multipliers hashed by instance index: [min, max] */
   sizeJitter?: [number, number];
   opacityJitter?: [number, number];
+  /** per-point size multiplier (one float per point) in the same units as `size`, e.g. the
+   *  landscape's per-node sizes in PointsMaterial units with size = spriteSizeForPointSize(1, fov) */
+  sizes?: Float32Array;
   /** per-point opacity multiplier (one float per point), e.g. the landscape's bottom fade */
   opacities?: Float32Array;
+  /** Phase 12.2: per-point COLOUR multiplier (one float per point), e.g. the landscape's crest
+   *  emphasis. A value > 1 feeds bloom on the half-float buffer (Phase 12.1) instead of clipping,
+   *  which an opacity > 1 could never do — emphasis belongs here, not in `opacities`. */
+  brightness?: Float32Array;
+  /** Phase 12.6: a per-point mix of `color` toward `to` (0 = `color`, 1 = `to`), applied before
+   *  `brightness` — the sternum nucleus is one draw whose core is blue-white and whose outer
+   *  ring is gold. One float per point. */
+  colorMix?: { to: string; mix: Float32Array };
   depthTest?: boolean;
   blending?: Blending;
   renderOrder?: number;
+  /** Phase 10.4: a slow per-point wander in the sprite's xy plane — each point is offset by
+   *  vec3(sin(ωt + h₁), cos(0.8ωt + h₂), 0)·amount with ω = 2π/period and h₁/h₂ hashed from the
+   *  instance index, so no two points move together. Omit it (reduced motion) for static points. */
+  drift?: { amount: number; period: number };
 }
 
 export interface PointSprites {
@@ -49,20 +78,48 @@ export interface PointSprites {
   dispose(): void;
 }
 
-/** One instanced draw of round sprites at static positions (the repo's Sparks.ts pattern). */
+/** Per-point sine wander, hashed on the instance index so each sprite has its own phase. */
+function driftOffset(d: { amount: number; period: number }) {
+  const omega = (Math.PI * 2) / d.period;
+  const h1 = hash(instanceIndex.add(7)).mul(Math.PI * 2);
+  const h2 = hash(instanceIndex.add(11)).mul(Math.PI * 2);
+  const t = time.mul(omega);
+  return vec3(sin(t.add(h1)), cos(t.mul(0.8).add(h2)), 0).mul(d.amount);
+}
+
+/** One instanced draw of Ali's Phase 10 soft round sprites at static positions (the repo's
+ *  Sparks.ts pattern): additive, no depth writes, size attenuation, never tone mapped. */
 export function createPointSprites(o: PointSpritesOptions): PointSprites {
   const count = o.points.length / 3;
   const material = new SpriteNodeMaterial();
-  material.positionNode = instancedArray(o.points, "vec3").element(instanceIndex);
+  const base = vec3(instancedArray(o.points, "vec3").element(instanceIndex));
+  material.positionNode =
+    o.drift && o.drift.amount > 0 && o.drift.period > 0 ? base.add(driftOffset(o.drift)) : base;
   const h = hash(instanceIndex.add(3));
   const jitter = (j: [number, number] | undefined) =>
     j ? float(j[0]).add(h.mul(j[1] - j[0])) : float(1);
-  material.scaleNode = float(o.size).mul(jitter(o.sizeJitter));
+  material.scaleNode = float(o.size)
+    .mul(jitter(o.sizeJitter))
+    .mul(o.sizes ? instancedArray(o.sizes, "float").element(instanceIndex) : float(1));
   const tint = o.tint ?? 1;
-  const color = tint >= 1 ? colorVec3(o.color) : vec3(mix(vec3(1, 1, 1), colorVec3(o.color), tint));
-  material.colorNode = vec4(color, 1);
-  // shapeCircle is typed as a bare Node in @types/three 0.185.4 (same gap as avatar/lines/Sparks.ts)
-  material.opacityNode = float(shapeCircle() as unknown as Parameters<typeof float>[0])
+  const tinted =
+    tint >= 1 ? colorVec3(o.color) : vec3(mix(vec3(1, 1, 1), colorVec3(o.color), tint));
+  const color = o.colorMix
+    ? vec3(
+        mix(
+          tinted,
+          colorVec3(o.colorMix.to),
+          instancedArray(o.colorMix.mix, "float").element(instanceIndex),
+        ),
+      )
+    : tinted;
+  material.colorNode = vec4(
+    o.brightness
+      ? vec3(color.mul(instancedArray(o.brightness, "float").element(instanceIndex)))
+      : color,
+    1,
+  );
+  material.opacityNode = softDisc()
     .mul(o.opacity)
     .mul(jitter(o.opacityJitter))
     .mul(o.opacities ? instancedArray(o.opacities, "float").element(instanceIndex) : float(1));
@@ -70,6 +127,7 @@ export function createPointSprites(o: PointSpritesOptions): PointSprites {
   material.depthTest = o.depthTest ?? true;
   material.depthWrite = false;
   material.blending = o.blending ?? AdditiveBlending;
+  material.toneMapped = false;
   const sprite = new Sprite(material);
   sprite.count = count;
   sprite.frustumCulled = false;

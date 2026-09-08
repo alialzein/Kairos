@@ -6,6 +6,7 @@ import type { WebGPURenderer } from "three/webgpu";
 import { FrameStats } from "@/avatar/telemetry/frametime";
 import { Background } from "./Background";
 import { Bust } from "./Bust";
+import { Dust } from "./Dust";
 import { Effects } from "./Effects";
 import { FaceCore } from "./FaceCore";
 import { Hud } from "./Hud";
@@ -164,11 +165,19 @@ export function SceneCanvas({
       if (existing) return existing;
       const promise = (async () => {
         const { WebGPURenderer } = await import("three/webgpu");
+        const { HalfFloatType } = await import("three/webgpu");
         // antialias: the scene pass inherits renderer.samples (4 when on), which the fat lines
-        // and the thin rings need for smooth edges
+        // and the thin rings need for smooth edges.
+        // outputBufferType: Phase 12.1 (Ali) "EffectComposer frameBufferType HalfFloat (explicit)".
+        // three already defaults to HalfFloatType here, but this is the knob that decides it:
+        // PassNode.setup() overwrites its render target's texture type with
+        // renderer.getOutputBufferType() every build, so the pass option in Effects.tsx alone
+        // would not hold. Half-float keeps line/particle values > 1 intact for the bloom bright
+        // pass instead of clipping them in the base image.
         const renderer = new WebGPURenderer({
           canvas,
           antialias: sceneConfig.render.antialias,
+          outputBufferType: HalfFloatType,
           powerPreference: "high-performance",
           forceWebGL: !!forceWebGL,
         });
@@ -217,10 +226,13 @@ export function SceneCanvas({
         <SceneCamera />
         {layers.background ? <Background /> : null}
         {layers.stars ? <Stars /> : null}
-        {layers.bust ? <Bust contours={layers.contours} /> : null}
+        {layers.bust ? (
+          <Bust contours={layers.contours} shell={layers.shell} halo={layers.halo} />
+        ) : null}
         {layers.core ? <FaceCore /> : null}
         {layers.neck ? <NeckCircuit /> : null}
         {layers.rings ? <Rings /> : null}
+        {layers.dust ? <Dust /> : null}
         {layers.landscape ? <Landscape /> : null}
         {layers.post ? <Effects /> : null}
         <FrameTicker waitForBust={layers.bust} onReady={onReady} />
