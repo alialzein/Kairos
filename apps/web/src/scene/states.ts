@@ -211,8 +211,35 @@ function baseSpec(name: SceneStateName): SceneStateSpec {
   };
 }
 
+/** A delta row: LISTENING's look with the named fields replaced (Ali's Step A table, approved
+ *  2026-09-08 with three changes — see docs/plans/scene-log.md "Seven-state wiring"). */
+function delta(
+  hex: string,
+  fields: Partial<Omit<SceneLook, "coreColor">>,
+  hud: SceneStateSpec["hud"],
+  rest: Omit<SceneStateSpec, "look" | "hud"> = { inMs: 600 },
+): SceneStateSpec {
+  return { look: { ...LISTENING_LOOK, ...fields, coreColor: linearRgb(hex) }, hud, ...rest };
+}
+
 export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
-  DORMANT: baseSpec("DORMANT"),
+  // DORMANT — page load, or IDLE after 90 s: a sleeping core, deep blue, everything at rest
+  DORMANT: delta(
+    "#0A3D7A",
+    {
+      coreIntensity: 0.3,
+      corePulsePeriod: 6,
+      ringBreathAmount: 0,
+      plumeFraction: 0.2,
+      plumeSpeed: 0.5,
+      neckPulseSpeed: 0,
+      neckBrightness: 0.4,
+      contourScroll: 0,
+      goldBrightness: 0.4,
+      dustDrift: 0.5,
+    },
+    { text: "STATUS: DORMANT", dot: "#0A3D7A", pulse: false },
+  ),
   IDLE: baseSpec("IDLE"),
   WAKING: baseSpec("WAKING"),
   // the identity row: `sceneConfig.hud.text` is the LISTENING readout the scene shipped with
