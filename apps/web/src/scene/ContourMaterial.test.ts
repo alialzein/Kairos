@@ -1,6 +1,6 @@
 import { Color, Vector3 } from "three/webgpu";
 import { describe, expect, it } from "vitest";
-import { createContourUniforms } from "./ContourMaterial";
+import { createContourMaterial, createContourUniforms } from "./ContourMaterial";
 import { sceneConfig } from "./sceneConfig";
 
 /** Phase 10.3 — the bead uniforms reach the shader from config, and the toggle is a 1/0 float
@@ -35,5 +35,28 @@ describe("createContourUniforms — hot core", () => {
     expect(u.hotRadius.value).toBe(sceneConfig.core.hot.radius);
     const hot = new Color(sceneConfig.palette.coreHot);
     expect(u.hotColor.value).toEqual(new Vector3(hot.r, hot.g, hot.b));
+  });
+});
+
+/** Phase 14.1 — selective bloom. The contour mesh leaves the bloom selection by writing black
+ *  into the scene pass's `bloomSrc` attachment, which is an `mrtNode` on the material (the pass
+ *  MRT merges it in, Effects.tsx). With `post.selectiveBloom` off there is no such attachment,
+ *  so the node must not be attached at all. */
+describe("createContourMaterial — bloom exclusion", () => {
+  it("attaches an MRT node writing the bloom-source mask", () => {
+    const { material } = createContourMaterial(sceneConfig);
+    expect(sceneConfig.post.selectiveBloom).toBe(true);
+    expect(material.mrtNode).not.toBeNull();
+    expect(material.mrtNode?.has("bloomSrc")).toBe(true);
+    // only bloomSrc is overridden: `output` comes from the pass MRT through MRTNode.merge()
+    expect(material.mrtNode?.has("output")).toBe(false);
+  });
+
+  it("leaves mrtNode null when post.selectiveBloom is false", () => {
+    const { material } = createContourMaterial({
+      ...sceneConfig,
+      post: { ...sceneConfig.post, selectiveBloom: false },
+    });
+    expect(material.mrtNode).toBeNull();
   });
 });

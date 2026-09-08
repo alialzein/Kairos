@@ -6,6 +6,7 @@ import {
   fract,
   fwidth,
   mix,
+  mrt,
   normalWorld,
   oneMinus,
   positionWorld,
@@ -14,6 +15,7 @@ import {
   time,
   uniform,
   vec3,
+  vec4,
 } from "three/tsl";
 import { Color, FrontSide, MeshBasicNodeMaterial, Vector3 } from "three/webgpu";
 import type { SceneConfig } from "./sceneConfig";
@@ -76,6 +78,18 @@ export interface ContourMaterial {
  * the centre reads white-hot and only the core's edge stays orange. The fill tint is untouched —
  * it stays `palette.core` — so the whiteness is carried by the lines, not by a wash.
  *
+ * Phase 14.1 (Ali) takes this material OUT of the bloom selection: it writes black into the scene
+ * pass's second colour attachment (`bloomSrc`, set up in Effects.tsx), so the fill between the
+ * contour lines no longer feeds the glow and reads as dark navy on the head sides, neck and
+ * shoulders. `material.mrtNode` MERGES with the pass MRT rather than replacing it
+ * (NodeMaterial.js:572 → MRTNode.merge, `{ ...this.outputNodes, ...mrtNode.outputNodes }`), so
+ * naming only `bloomSrc` keeps the pass's `output` for the visible frame — the mesh looks
+ * identical, it just stops contributing to bloom. The shell (BustShell.ts) and the silhouette
+ * halo (BustHalo.ts) set no `mrtNode` and stay in the selection, so the outline still glows.
+ * The node is only attached when `post.selectiveBloom` is on: with the flag off the pass has no
+ * MRT, and a material MRT naming an attachment that does not exist resolves to an empty output
+ * struct (MRTNode.setup() skips names getTextureIndex() cannot find).
+ *
  * float()/vec3() wrappers reify intermediate nodes: @types/three 0.185.4 narrows some TSL
  * overloads (mix(vec3, vec3, float), smoothstep with uniform edges) to `never` — the same gap
  * lines/LineBust.ts works around.
@@ -132,5 +146,7 @@ export function createContourMaterial(cfg: SceneConfig): ContourMaterial {
   material.colorNode = col;
   material.side = FrontSide;
   material.fog = false;
+  // Phase 14.1: out of the bloom selection — see the header note on the MRT merge
+  if (cfg.post.selectiveBloom) material.mrtNode = mrt({ bloomSrc: vec4(0, 0, 0, 1) });
   return { material, uniforms: u };
 }

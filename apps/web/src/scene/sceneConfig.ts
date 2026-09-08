@@ -447,6 +447,12 @@ export interface SceneConfig {
     /** bright-pass resolution: 1 thresholds per full-res pixel like pmndrs; three's default
      *  0.5 box-averages the sub-pixel contour lines under the threshold (cheaper) */
     bloomResolutionScale: number;
+    /** Phase 14.1 (Ali) — selective bloom: the bust contour mesh is excluded from the glow so the
+     *  gaps between its lines stay dark navy. Ali wrote it as pmndrs `Selection`/`SelectiveBloom`,
+     *  which is WebGL-only; the equivalent here is a second colour attachment on the scene pass
+     *  that carries the bloom source, with ContourMaterial writing black into it (Effects.tsx).
+     *  `false` restores the single-attachment chain unchanged, for `?set=post.selectiveBloom:false`. */
+    selectiveBloom: boolean;
     /** pmndrs Vignette offset / darkness */
     vignetteOffset: number;
     vignetteDarkness: number;
@@ -832,6 +838,9 @@ export const sceneConfig: SceneConfig = {
     bloomThreshold: 0.3,
     bloomSmoothing: 0.3,
     bloomResolutionScale: 1,
+    // Phase 14.1 (Ali): the contour mesh leaves the bloom selection; strength/threshold/radius
+    // are untouched, so everything still in the selection glows exactly as before.
+    selectiveBloom: true,
     vignetteOffset: 0.3,
     vignetteDarkness: 0.7,
   },
