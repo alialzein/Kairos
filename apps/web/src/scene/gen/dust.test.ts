@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "@/avatar/sim/random";
-import { sceneConfig } from "../sceneConfig";
+import { sceneConfig, type Vec3 } from "../sceneConfig";
 import { boxPoints, plumeSeeds } from "./dust";
 
 describe("boxPoints", () => {
@@ -53,6 +53,104 @@ describe("boxPoints", () => {
 
   it("matches the configured ambient dust volume", () => {
     const a = sceneConfig.dust.ambient;
+    expect(boxPoints(a, mulberry32(a.seed)).length).toBe(a.count * 3);
+  });
+});
+
+describe("boxPoints focus (Phase 13.3)", () => {
+  const box = {
+    center: [0, 0.8, -0.4] as Vec3,
+    size: [6, 4, 3] as Vec3,
+    count: 20000,
+  };
+  const focus = { center: [0, 1.45, 0] as Vec3, falloff: 1 };
+  const o = { ...box, focus };
+  const p = boxPoints(o, mulberry32(19));
+  /** distance from the focus centre of point `i` */
+  const dist = (pts: Float32Array, i: number) =>
+    Math.hypot(
+      (pts[i * 3] ?? 0) - focus.center[0],
+      (pts[i * 3 + 1] ?? 0) - focus.center[1],
+      (pts[i * 3 + 2] ?? 0) - focus.center[2],
+    );
+  /** mean of the keep weight 1 / (1 + (d / falloff)²) over a draw */
+  const meanWeight = (pts: Float32Array) => {
+    const n = pts.length / 3;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const d = dist(pts, i) / focus.falloff;
+      sum += 1 / (1 + d * d);
+    }
+    return sum / n;
+  };
+
+  it("still emits count xyz points inside the box", () => {
+    expect(p.length).toBe(o.count * 3);
+    for (let i = 0; i < o.count; i++) {
+      for (let a = 0; a < 3; a++) {
+        const v = p[i * 3 + a] ?? 0;
+        expect(v).toBeGreaterThanOrEqual((o.center[a] ?? 0) - (o.size[a] ?? 0) / 2 - 1e-9);
+        expect(v).toBeLessThanOrEqual((o.center[a] ?? 0) + (o.size[a] ?? 0) / 2 + 1e-9);
+      }
+    }
+  });
+
+  it("pulls the cloud toward the focus centre", () => {
+    const uniform = boxPoints(box, mulberry32(19));
+    // rejection sampling on w = 1 / (1 + d²) makes the accepted mean E[w²] / E[w], so the ratio
+    // against the uniform draw is exactly w's coefficient of variation, E[w²] / E[w]². Over this
+    // 6 × 4 × 3 box at falloff 1 that is ~1.49 — it is a whole-cloud average, deliberately much
+    // flatter than the near/far density ratio the next test measures.
+    expect(meanWeight(p)).toBeGreaterThan(1.4 * meanWeight(uniform));
+  });
+
+  it("falls off with distance: the innermost shell is > 5× as dense as the outermost", () => {
+    const uniform = boxPoints(box, mulberry32(19));
+    const edges = [0, 0.5, 1, 2, 3];
+    const shell = (pts: Float32Array) => {
+      const bins = [0, 0, 0, 0];
+      for (let i = 0; i < pts.length / 3; i++) {
+        const d = dist(pts, i);
+        for (let b = 0; b < 4; b++) {
+          if (d >= (edges[b] ?? 0) && d < (edges[b + 1] ?? 0)) bins[b] = (bins[b] ?? 0) + 1;
+        }
+      }
+      return bins;
+    };
+    const got = shell(p);
+    const even = shell(uniform);
+    // the uniform draw is a Monte-Carlo measure of each shell's volume clipped to the box, so
+    // focused / uniform per shell IS the density per unit volume (both draws have `count` points)
+    const density = got.map((c, b) => c / (even[b] ?? 1));
+    expect(even.every((c) => c > 100)).toBe(true); // every shell measured on enough samples
+    expect(density[0] ?? 0).toBeGreaterThan(5 * (density[3] ?? 0));
+    for (let b = 1; b < 4; b++) expect(density[b] ?? 0).toBeLessThan(density[b - 1] ?? 0);
+  });
+
+  it("is deterministic per seed", () => {
+    expect(Array.from(boxPoints(o, mulberry32(8)))).toEqual(
+      Array.from(boxPoints(o, mulberry32(8))),
+    );
+  });
+
+  it("caps the attempts and returns a shorter array when nothing is accepted", () => {
+    const starved = boxPoints(
+      { ...box, count: 200, focus: { ...focus, falloff: 1e-6 } },
+      mulberry32(5),
+    );
+    expect(starved.length % 3).toBe(0);
+    expect(starved.length).toBeLessThan(200 * 3); // count · 50 attempts, ~none accepted
+  });
+
+  it("leaves the unfocused draw untouched", () => {
+    expect(Array.from(boxPoints({ ...box, count: 500 }, mulberry32(3)))).toEqual(
+      Array.from(boxPoints({ ...box, count: 500, focus: undefined }, mulberry32(3))),
+    );
+  });
+
+  it("matches the configured ambient focus", () => {
+    const a = sceneConfig.dust.ambient;
+    expect(a.focus.center).toEqual(sceneConfig.bust.headCenter);
     expect(boxPoints(a, mulberry32(a.seed)).length).toBe(a.count * 3);
   });
 });

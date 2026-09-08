@@ -26,7 +26,7 @@ import { colorVec3, createPointSprites, softDisc, spriteSizeForPointSize } from 
  * Phase 11.4 (Ali) — "ambient particle life everywhere, strongest above the head". Two objects,
  * both driven entirely by TSL `time` (no per-frame JS, nothing allocated per frame):
  *
- * 1. `dust.ambient` — the global dust volume: `count` soft sprites uniform in a 6 × 4 × 3 box
+ * 1. `dust.ambient` — the global dust volume: `count` soft sprites drawn in a 6 × 4 × 3 box
  *    around the bust (gen/dust.ts `boxPoints`), each wandering on the shared Phase 10 sprite's
  *    per-point `drift` offset. depthTest on, so the bust occludes the points behind it.
  * 2. `dust.plume` — the crown plume: `count` sprites in a cone rooted at the crown, rising to
@@ -43,6 +43,12 @@ import { colorVec3, createPointSprites, softDisc, spriteSizeForPointSize } from 
  * Phase 12.7 (Ali) — the ambient pass of the glow phase: 8,000 dust points over ×3 the size
  * spread and a 5,000-point plume out of a wider, taller cone at `plume.brightness`× its colour.
  * Both counts go through `sceneCount`, so a mobile viewport builds half of each.
+ *
+ * Phase 13.3 (Ali) — the final balance: 20,000 dust points, no longer uniform. `ambient.focus`
+ * rides in on the spread override, so `boxPoints` rejection-samples toward the head centre
+ * (1 / (1 + d²)) — mist inside the rings, clean frame corners — and the plume is ×1.5 at 7,500
+ * out of the same cone. The ambient sprite count comes off the returned array, not off `count`,
+ * because a degenerate focus can return a short array (see `boxPoints`).
  *
  * float()/vec2()/vec3() wrappers reify intermediate nodes for the same reason as BustShell.ts:
  * @types/three 0.185.4 narrows some TSL overloads (mix, smoothstep) to `never`.

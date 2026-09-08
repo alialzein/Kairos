@@ -309,17 +309,21 @@ export interface SceneConfig {
    *  sub-layers, one object each, both animated entirely on TSL `time` (no per-frame JS) and
    *  both still under reduced motion. Replaces the Phase 10.4 `rings.drift` disc. */
   dust: {
-    /** Phase 11.4 (Ali): the global dust volume — `count` points uniform in an axis-aligned box
+    /** Phase 11.4 (Ali): the global dust volume — `count` points in an axis-aligned box
      *  of full extent `size` (6 × 4 × 3) centred on `center`, drawn as the shared Phase 10 soft
      *  sprite at `pointSize` (PointsMaterial units × `particles.sizeScale`) and `opacity`, with
      *  per-point size/opacity multipliers from `sizeJitter` / `opacityJitter`. Each point
      *  wanders up to `drift.amount` world units on a per-point-hashed sine of TSL time with
      *  period `drift.period` seconds; `seed` places the points. depthTest stays on so the bust
-     *  occludes the points behind it. */
+     *  occludes the points behind it. Phase 13.3 adds `focus`, which biases the draw toward the
+     *  head centre instead of spreading it uniformly. */
     ambient: {
       center: Vec3;
       size: Vec3;
       count: number;
+      /** Phase 13.3 (Ali): a point at distance d from `center` is kept with probability
+       *  1 / (1 + (d / falloff)²) — misty inside the rings, sparse at the frame corners */
+      focus: { center: Vec3; falloff: number };
       pointSize: number;
       opacity: number;
       sizeJitter: [number, number];
@@ -708,11 +712,18 @@ export const sceneConfig: SceneConfig = {
   // specks and far ones instead of one uniform grain; the plume 1,500 → 5,000 out of a wider
   // base (0.25 → 0.35) and half a unit higher (1.2 → 1.6) at ×1.5 the colour. Both counts —
   // like every count in the scene — halve below `perf.mobileWidth` (motion.ts `sceneCount`).
+  // Phase 13.3 (Ali), final balance: "particle mist around the head, clean corners". Dust
+  // 8,000 → 20,000, no longer uniform — `ambient.focus` keeps a candidate with probability
+  // 1 / (1 + d²) at distance d from the head centre, so the ~0.2 that survive land mostly inside
+  // the rings and the frame corners stay sparse. The plume goes 5,000 → 7,500 out of the same
+  // cone.
   dust: {
     ambient: {
       center: [0, 0.8, -0.4],
       size: [6, 4, 3],
-      count: 8000,
+      count: 20000,
+      // = `bust.headCenter`
+      focus: { center: [0, 1.45, 0], falloff: 1 },
       pointSize: 0.01,
       opacity: 0.35,
       // Phase 12.7: size variance ×3 — the ±0.4 spread becomes ±1.2, clamped at 0.2 so no
@@ -730,7 +741,8 @@ export const sceneConfig: SceneConfig = {
       period: 6,
       speedJitter: [0.7, 1.3],
       wobble: 0.04,
-      count: 5000,
+      // Phase 13.3: ×1.5, same cone
+      count: 7500,
       pointSize: 0.015,
       opacity: 0.6,
       brightness: 1.5,
