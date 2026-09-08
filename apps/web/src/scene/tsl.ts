@@ -60,6 +60,10 @@ export interface PointSpritesOptions {
    *  emphasis. A value > 1 feeds bloom on the half-float buffer (Phase 12.1) instead of clipping,
    *  which an opacity > 1 could never do — emphasis belongs here, not in `opacities`. */
   brightness?: Float32Array;
+  /** Seven-state wiring (b5-32): a shared COLOUR multiplier node — a uniform the state driver
+   *  writes, applied on top of the per-point `brightness` array (`neckBrightness`,
+   *  `goldBrightness`). Omitted = ×1, i.e. the colour node is left exactly as it was. */
+  brightnessNode?: Parameters<typeof float>[0];
   /** Phase 12.6: a per-point mix of `color` toward `to` (0 = `color`, 1 = `to`), applied before
    *  `brightness` — the sternum nucleus is one draw whose core is blue-white and whose outer
    *  ring is gold. One float per point. */
@@ -69,8 +73,11 @@ export interface PointSpritesOptions {
   renderOrder?: number;
   /** Phase 10.4: a slow per-point wander in the sprite's xy plane — each point is offset by
    *  vec3(sin(ωt + h₁), cos(0.8ωt + h₂), 0)·amount with ω = 2π/period and h₁/h₂ hashed from the
-   *  instance index, so no two points move together. Omit it (reduced motion) for static points. */
-  drift?: { amount: number; period: number };
+   *  instance index, so no two points move together. Omit it (reduced motion) for static points.
+   *  Seven-state wiring (b5-32): `scale` is an optional node multiplied into `amount` (the state
+   *  driver's `dustDrift`), so the wander can be widened or stopped without rebuilding the graph;
+   *  omitted = ×1. */
+  drift?: { amount: number; period: number; scale?: Parameters<typeof float>[0] };
 }
 
 export interface PointSprites {
@@ -79,12 +86,13 @@ export interface PointSprites {
 }
 
 /** Per-point sine wander, hashed on the instance index so each sprite has its own phase. */
-function driftOffset(d: { amount: number; period: number }) {
+function driftOffset(d: NonNullable<PointSpritesOptions["drift"]>) {
   const omega = (Math.PI * 2) / d.period;
   const h1 = hash(instanceIndex.add(7)).mul(Math.PI * 2);
   const h2 = hash(instanceIndex.add(11)).mul(Math.PI * 2);
   const t = time.mul(omega);
-  return vec3(sin(t.add(h1)), cos(t.mul(0.8).add(h2)), 0).mul(d.amount);
+  const amount = d.scale === undefined ? float(d.amount) : float(d.amount).mul(float(d.scale));
+  return vec3(sin(t.add(h1)), cos(t.mul(0.8).add(h2)), 0).mul(amount);
 }
 
 /** One instanced draw of Ali's Phase 10 soft round sprites at static positions (the repo's
@@ -113,10 +121,11 @@ export function createPointSprites(o: PointSpritesOptions): PointSprites {
         ),
       )
     : tinted;
+  const perPoint = o.brightness
+    ? vec3(color.mul(instancedArray(o.brightness, "float").element(instanceIndex)))
+    : color;
   material.colorNode = vec4(
-    o.brightness
-      ? vec3(color.mul(instancedArray(o.brightness, "float").element(instanceIndex)))
-      : color,
+    o.brightnessNode === undefined ? perPoint : vec3(perPoint.mul(float(o.brightnessNode))),
     1,
   );
   material.opacityNode = softDisc()

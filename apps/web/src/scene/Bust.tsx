@@ -7,7 +7,6 @@ import { createBustHalo } from "./BustHalo";
 import { createBustShell } from "./BustShell";
 import { createContourMaterial } from "./ContourMaterial";
 import { meshBust, primitiveBust } from "./gen/bustGeometry";
-import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
 import { useSceneStore } from "./store";
 
@@ -69,9 +68,10 @@ export function Bust({
 
   const material = useMemo(() => {
     if (contours) {
-      const { material, uniforms } = createContourMaterial(sceneConfig);
-      // Phase 9: the slow upward line drift is motion — still under reduced motion
-      if (!sceneMotionEnabled()) uniforms.scrollSpeed.value = 0;
+      // Phase 9: the slow upward line drift is motion — still under reduced motion. b5-32: the
+      // drift is the state driver's accumulated `scrollOffset` now, and the driver stops
+      // accumulating it under reduced motion, so the offset simply stays 0 (SceneStateDriver.tsx).
+      const { material } = createContourMaterial(sceneConfig);
       return material;
     }
     const m = new MeshBasicNodeMaterial({ color: new Color(sceneConfig.palette.fill) });

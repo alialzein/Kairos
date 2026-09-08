@@ -9,6 +9,7 @@ import {
   mix,
   sin,
   smoothstep,
+  step,
   time,
   vec2,
   vec3,
@@ -20,6 +21,7 @@ import { currentVerticalFov } from "./framing";
 import { boxPoints, plumeSeeds } from "./gen/dust";
 import { sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
+import { stateUniforms } from "./stateUniforms";
 import { colorVec3, createPointSprites, softDisc, spriteSizeForPointSize } from "./tsl";
 
 /**
@@ -50,6 +52,12 @@ import { colorVec3, createPointSprites, softDisc, spriteSizeForPointSize } from 
  * out of the same cone. The ambient sprite count comes off the returned array, not off `count`,
  * because a degenerate focus can return a short array (see `boxPoints`).
  *
+ * b5-32 (seven-state wiring): the plume rides the state driver's accumulated `plumeClock`
+ * (seconds × `look.plumeSpeed`) instead of TSL `time`, so a speed change never jumps the rise, and
+ * `plumeFraction` hides the tail of the instance range — `step((i + 1)/count, fraction)`, so 1
+ * draws every sprite (identity) and 0 draws none. The ambient drift's amount is scaled by the
+ * driver's `dustDrift` uniform through `createPointSprites`'s new `drift.scale`.
+ *
  * float()/vec2()/vec3() wrappers reify intermediate nodes for the same reason as BustShell.ts:
  * @types/three 0.185.4 narrows some TSL overloads (mix, smoothstep) to `never`.
  */
@@ -71,7 +79,15 @@ export function Dust() {
       sizeJitter: a.sizeJitter,
       opacityJitter: a.opacityJitter,
       depthTest: true,
-      ...(motion ? { drift: { amount: a.drift.amount, period: a.drift.period } } : {}),
+      ...(motion
+        ? {
+            drift: {
+              amount: a.drift.amount,
+              period: a.drift.period,
+              scale: stateUniforms.dustDrift,
+            },
+          }
+        : {}),
     });
 
     const p = { ...dust.plume, count: sceneCount(dust.plume.count) };
@@ -80,7 +96,9 @@ export function Dust() {
     const phase = float(instancedArray(seeds.phase, "float").element(instanceIndex));
     const speed = float(instancedArray(seeds.speed, "float").element(instanceIndex));
     // rise 0 → 1 → wrap; still (each particle parked at its seeded height) under reduced motion
-    const t = motion ? float(fract(time.mul(speed).div(p.period).add(phase))) : phase;
+    const t = motion
+      ? float(fract(float(stateUniforms.plumeClock).mul(speed).div(p.period).add(phase)))
+      : phase;
     const radius = float(mix(float(p.baseRadius), float(p.topRadius), t));
     // lateral sway; frozen to a per-particle constant offset under reduced motion
     const swayPhase = phase.mul(Math.PI * 2);
@@ -98,10 +116,17 @@ export function Dust() {
     // buffer instead of clipping the way an opacity above 1 would
     const spray = vec3(mix(colorVec3(palette.line), vec3(1, 1, 1), float(0.3)));
     material.colorNode = vec4(vec3(spray.mul(float(p.brightness))), 1);
+    // `plumeFraction`: the sprites past the visible share are multiplied to zero opacity (one
+    // instanced draw stays one draw). At 1 every index passes — `(i + 1)/count ≤ 1` — so the
+    // expression is ×1 at the LISTENING identity.
+    const visible = float(
+      step(float(instanceIndex).add(1).div(seeds.phase.length), stateUniforms.plumeFraction),
+    );
     material.opacityNode = softDisc()
       .mul(p.opacity)
       .mul(float(smoothstep(float(0), float(0.08), t)))
-      .mul(float(1).sub(t));
+      .mul(float(1).sub(t))
+      .mul(visible);
     material.transparent = true;
     material.depthTest = true;
     material.depthWrite = false;

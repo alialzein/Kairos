@@ -9,6 +9,8 @@ import { currentVerticalFov } from "./framing";
 import { neckCircuit } from "./gen/neck";
 import { sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
+import { stateUniforms } from "./stateUniforms";
+import { currentLook } from "./states";
 import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
 
 /**
@@ -37,6 +39,12 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  * bloom on the half-float buffer, which an opacity never could). The sternum cluster becomes
  * `neck.nucleus` — one draw of 300 sprites mixed per point from `palette.edge` at the core to
  * `palette.gold` at the rim — under the same hot core sprite, now blue-white at `core.brightness`.
+ *
+ * b5-32 (seven-state wiring): the travelling pulse runs at `motion.neckPulse.speed ×
+ * look.neckPulseSpeed`, and all five sprite layers (strand beads, branch beads, end beads, the
+ * nucleus and its hot core) carry the driver's `neckBrightness` as a shared colour multiplier on
+ * top of their per-bead `brightness` arrays. Both are ×1 at the LISTENING identity. The two fat-line
+ * objects keep `neck.opacity` alone — they are the trace under the beads, not the circuitry.
  */
 export function NeckCircuit() {
   const scene = useThree((s) => s.scene);
@@ -147,6 +155,7 @@ export function NeckCircuit() {
       // Phase 12.6: the per-bead 0.65–1.3 draw is a COLOUR multiplier now, not an opacity — the
       // bright half of the range overdrives the bead into the bloom instead of clipping at white
       brightness: circuit.strandBrightness,
+      brightnessNode: stateUniforms.neckBrightness,
       depthTest: false,
       renderOrder: 11,
     });
@@ -159,6 +168,7 @@ export function NeckCircuit() {
       color: palette.gold,
       opacity: neck.strandPoints.opacity,
       brightness: circuit.branchBrightness,
+      brightnessNode: stateUniforms.neckBrightness,
       depthTest: false,
       renderOrder: 11,
     });
@@ -169,6 +179,7 @@ export function NeckCircuit() {
       size: spriteSizeForPointSize(neck.branches.endBead.size * particles.sizeScale, fov),
       color: palette.gold,
       opacity: neck.branches.endBead.opacity,
+      brightnessNode: stateUniforms.neckBrightness,
       depthTest: false,
       renderOrder: 12,
     });
@@ -181,6 +192,7 @@ export function NeckCircuit() {
       color: palette.edge,
       colorMix: { to: palette.gold, mix: circuit.nucleusMix },
       brightness: circuit.nucleusBrightness,
+      brightnessNode: stateUniforms.neckBrightness,
       opacity: 1,
       depthTest: false,
       renderOrder: 11,
@@ -193,6 +205,7 @@ export function NeckCircuit() {
       color: palette.edge,
       opacity: neck.nucleus.core.opacity,
       brightness: Float32Array.of(neck.nucleus.core.brightness),
+      brightnessNode: stateUniforms.neckBrightness,
       depthTest: false,
       renderOrder: 12,
     });
@@ -226,7 +239,7 @@ export function NeckCircuit() {
   const pulseMaterial = useRef(built.pulse?.material ?? null);
   useFrame((_, delta) => {
     const m = pulseMaterial.current;
-    if (m) m.dashOffset -= built.speed * delta;
+    if (m) m.dashOffset -= built.speed * currentLook.neckPulseSpeed * delta;
   });
 
   useEffect(() => {

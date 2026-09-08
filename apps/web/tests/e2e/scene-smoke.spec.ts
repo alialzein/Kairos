@@ -5,6 +5,9 @@ import { expect, test } from "@playwright/test";
 // nothing ever renders there (bisect on ci/scene-bisect, runs 34098121956 / 34136858023 /
 // 34137480858, 2026-09-07). WebGL2 renders on the runner. Elsewhere the page picks its backend.
 const SCENE_URL = process.env.CI ? "/bench/scene?webgl=1" : "/bench/scene";
+/** the same backend choice for any other bench URL: `?webgl=1` on CI only */
+const sceneUrl = (query: string) =>
+  `/bench/scene?${query}${process.env.CI ? "&webgl=1" : ""}` as const;
 
 test("scene bench page boots on WebGPU or WebGL and keeps rendering", async ({ page }) => {
   const errors: string[] = [];
@@ -42,4 +45,15 @@ test("layers can be switched from the query string", async ({ page }) => {
     await page.waitForFunction(() => (window.__twinScene?.stats.count ?? 0) >= 30, null, {
       timeout: 60_000,
     });
+});
+
+// b5-32 (seven-state wiring): `?state=NAME` forces the avatar state before the canvas mounts, the
+// HUD reads that state's row and the bench publishes it. `?only=background,hud` keeps the page
+// light enough for software WebGL2 on the runner — the driver mounts inside the Canvas regardless
+// of which layers are on, so the state still reaches `window.__twinScene`.
+test("?state= drives the HUD readout and the published state", async ({ page }) => {
+  await page.goto(sceneUrl("only=background,hud&state=OFFLINE"));
+  await page.waitForFunction(() => window.__twinScene?.ready === true, null, { timeout: 60_000 });
+  await expect(page.locator("[data-scene-hud]")).toHaveText(/status: offline/i);
+  expect(await page.evaluate(() => window.__twinScene?.state)).toBe("OFFLINE");
 });

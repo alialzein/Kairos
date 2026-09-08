@@ -1,6 +1,6 @@
 "use client";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Color, DoubleSide, Group, Mesh, MeshBasicNodeMaterial, RingGeometry } from "three/webgpu";
 import { makeNoise } from "@/avatar/sim/noise";
 import { mulberry32 } from "@/avatar/sim/random";
@@ -8,6 +8,7 @@ import { currentVerticalFov } from "./framing";
 import { ringPoints, ringSpecs } from "./gen/rings";
 import { sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
+import { currentLook } from "./states";
 import { createPointSprites, spriteSizeForPointSize, type PointSprites } from "./tsl";
 
 /**
@@ -99,19 +100,29 @@ export function Rings() {
   }, []);
   // Phase 9 (plan Phase 6 optional): every ring breathes 1 → 1 + amount → 1 over `period`
   // with a per-ring phase offset; scale-only updates, nothing allocated; still under reduced
-  // motion
+  // motion.
+  // b5-32 (seven-state wiring): the rate and the amount are the state driver's — `ringBreathPeriod`
+  // seconds per breath, `motion.ringBreath.amount × look.ringBreathAmount` deep. The phase is
+  // ACCUMULATED (`+= 2π/period · dt`) rather than `elapsedTime · 2π/period`, so a state that
+  // changes the period never jumps the scale mid-breath. At the LISTENING identity the
+  // accumulation is `elapsedTime · 2π/motion.ringBreath.period` and the amount is the config's.
   const breath = useMemo(() => {
     const b = sceneConfig.motion.ringBreath;
     return sceneMotionEnabled() && b.amount > 0 && b.period > 0
-      ? { amount: b.amount, omega: (Math.PI * 2) / b.period, stagger: b.stagger }
+      ? { amount: b.amount, stagger: b.stagger }
       : null;
   }, []);
-  useFrame(({ clock }) => {
+  const phase = useRef(0);
+  useFrame((_, delta) => {
     if (!breath) return;
-    const t = clock.elapsedTime * breath.omega;
-    built.meshes.forEach((mesh, i) => {
-      mesh.scale.setScalar(1 + breath.amount * 0.5 * (1 + Math.sin(t + i * breath.stagger)));
-    });
+    const look = currentLook;
+    if (look.ringBreathPeriod > 0) phase.current += ((Math.PI * 2) / look.ringBreathPeriod) * delta;
+    const t = phase.current;
+    const amount = breath.amount * look.ringBreathAmount;
+    const meshes = built.meshes;
+    for (let i = 0; i < meshes.length; i++) {
+      meshes[i]?.scale.setScalar(1 + amount * 0.5 * (1 + Math.sin(t + i * breath.stagger)));
+    }
   });
 
   useEffect(() => {

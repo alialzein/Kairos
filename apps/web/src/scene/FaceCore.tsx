@@ -1,11 +1,10 @@
 "use client";
 import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
-import { float, oneMinus, sin, time, uv, vec4 } from "three/tsl";
+import { float, oneMinus, sin, uv, vec3, vec4 } from "three/tsl";
 import { AdditiveBlending, Sprite, SpriteNodeMaterial } from "three/webgpu";
-import { sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
-import { colorVec3 } from "./tsl";
+import { stateUniforms } from "./stateUniforms";
 
 /**
  * Phase 4 — the warm glow bloom picks up on the face (docs/plans/scene-plan.md Phase 4). One
@@ -20,20 +19,29 @@ import { colorVec3 } from "./tsl";
  * Phase 12.4 (Ali): the sprite is 1.5× brighter. `glow.brightness` multiplies the *colour*, not
  * the opacity — opacity is capped at 1, while the half-float scene buffer (Phase 12.1) carries a
  * colour > 1 straight into bloom.
+ *
+ * b5-32 (seven-state wiring): the colour is the state driver's `coreColor · coreIntensity` and the
+ * breathing runs off its accumulated `pulsePhase` × the state's `corePulseAmount` instead of TSL
+ * `time · core.pulseSpeed`. Reduced motion is the driver's job now: it never advances the phase
+ * (so the wave stays sin(0) = 0, as it did) and the engine forces the amplitude to 0.
  */
 export function FaceCore() {
   const scene = useThree((s) => s.scene);
   const sprite = useMemo(() => {
-    const { core, palette } = sceneConfig;
+    const { core } = sceneConfig;
+    const su = stateUniforms;
     const material = new SpriteNodeMaterial();
     const r = float(uv().sub(0.5).mul(2).length());
-    // Phase 9: no breathing under reduced motion (a constant wave of 0)
-    const wave = sin(time.mul(sceneMotionEnabled() ? core.pulseSpeed : 0));
-    const pulse = float(oneMinus(core.pulseAmount)).add(float(core.pulseAmount).mul(wave));
-    material.colorNode = vec4(colorVec3(palette.core).mul(core.glow.brightness), 1);
+    const wave = sin(su.pulsePhase);
+    const amount = float(core.pulseAmount).mul(su.corePulseAmount);
+    const pulse = float(oneMinus(amount)).add(amount.mul(wave));
+    material.colorNode = vec4(
+      vec3(vec3(su.coreColor).mul(core.glow.brightness)).mul(su.coreIntensity),
+      1,
+    );
     material.opacityNode = float(oneMinus(r)).clamp(0, 1).mul(core.glow.alpha).mul(pulse);
     material.scaleNode = float(core.glow.size).mul(
-      float(1).add(float(core.pulseAmount * core.glow.scalePulse).mul(wave)),
+      float(1).add(amount.mul(core.glow.scalePulse).mul(wave)),
     );
     material.transparent = true;
     material.blending = AdditiveBlending;

@@ -18,11 +18,15 @@ export interface SceneStore {
   error: string | null;
   backend: SceneBackend | null;
   stats: SceneStats;
+  /** b5-32 bench `?hold=<seconds>`: pins the state engine's clock that many seconds after the
+   *  current state was entered, so a screenshot of a transition is reproducible. null = live. */
+  hold: number | null;
   setReady: (ready: boolean) => void;
   setBustReady: (bustReady: boolean) => void;
   setError: (error: string | null) => void;
   setBackend: (backend: SceneBackend) => void;
   setStats: (stats: SceneStats) => void;
+  setHold: (hold: number | null) => void;
   reset: () => void;
 }
 
@@ -32,6 +36,7 @@ const initial = () => ({
   error: null,
   backend: null,
   stats: { p50: 0, p95: 0, count: 0 },
+  hold: null,
 });
 
 export const useSceneStore = create<SceneStore>()((set) => ({
@@ -41,5 +46,6 @@ export const useSceneStore = create<SceneStore>()((set) => ({
   setError: (error) => set({ error }),
   setBackend: (backend) => set({ backend }),
   setStats: (stats) => set({ stats }),
+  setHold: (hold) => set({ hold }),
   reset: () => set(initial()),
 }));

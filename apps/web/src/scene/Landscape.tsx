@@ -15,6 +15,7 @@ import { currentVerticalFov } from "./framing";
 import { landscape } from "./gen/landscape";
 import { landscapeCols, sceneCount, sceneMotionEnabled } from "./motion";
 import { sceneConfig } from "./sceneConfig";
+import { stateUniforms } from "./stateUniforms";
 import { attribute, float, sin, time } from "three/tsl";
 import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
 
@@ -33,6 +34,11 @@ import { colorVec3, createPointSprites, spriteSizeForPointSize } from "./tsl";
  * weight onto the particles: 16,170 nodes per side, edges down to 5 % opacity, and 15,000 slope
  * dust points per side at per-point sizes, drawn toward the crests — glowing particulate terrain
  * rather than a net, with the ridge lines still the brightest thing on each side.
+ *
+ * b5-32 (seven-state wiring): everything GOLD — the crest edges, the gold nodes and the ridge dust
+ * — is multiplied by the state driver's `goldBrightness` uniform (a colour multiplier, like every
+ * other emphasis here, so > 1 feeds bloom). ×1 at the LISTENING identity; the Phase 9 opacity
+ * shimmer on the gold edges is untouched.
  */
 export function Landscape() {
   const scene = useThree((s) => s.scene);
@@ -71,6 +77,8 @@ export function Landscape() {
       brightness: Float32Array,
       hex: string,
       opacity: number,
+      /** b5-32: the state driver's gold multiplier, for the gold pass only */
+      brightnessNode?: Parameters<typeof float>[0],
     ) => {
       const geometry = new BufferGeometry();
       geometry.setAttribute("position", new Float32BufferAttribute(segments, 3));
@@ -83,7 +91,8 @@ export function Landscape() {
         depthWrite: false,
       });
       material.fog = false;
-      material.colorNode = colorVec3(hex).mul(brightAttr);
+      const tint = colorVec3(hex).mul(brightAttr);
+      material.colorNode = brightnessNode === undefined ? tint : tint.mul(float(brightnessNode));
       material.opacityNode = float(opacity).mul(fadeAttr);
       const obj = new LineSegments(geometry, material);
       obj.frustumCulled = false;
@@ -96,7 +105,14 @@ export function Landscape() {
       palette.landscape,
       l.edgeOpacity,
     );
-    const gold = lines(mesh.gold, mesh.goldFade, mesh.goldBrightness, palette.gold, l.goldOpacity);
+    const gold = lines(
+      mesh.gold,
+      mesh.goldFade,
+      mesh.goldBrightness,
+      palette.gold,
+      l.goldOpacity,
+      stateUniforms.goldBrightness,
+    );
     // Phase 9: gold shimmer — opacity between from and to on TSL time (no per-frame JS work);
     // the plan's "if a shimmer is wanted, animate the gold opacity between 0.6 and 0.9 slowly"
     const { goldShimmer } = motion;
@@ -128,6 +144,7 @@ export function Landscape() {
       opacity: l.nodeOpacity,
       opacities: mesh.goldNodeFade,
       brightness: mesh.goldNodeBrightness,
+      brightnessNode: stateUniforms.goldBrightness,
     });
     // Phase 13.2: the slope dust is the layer's particle mass — 15,000 points per side at a
     // per-point size, so it shares the nodes' unit conversion and `mesh.dustSizes` does the rest
@@ -147,6 +164,7 @@ export function Landscape() {
       color: palette.gold,
       opacity: l.crest.dust.opacity,
       opacities: mesh.goldDustFade,
+      brightnessNode: stateUniforms.goldBrightness,
     });
 
     return {
