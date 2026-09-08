@@ -317,7 +317,23 @@ export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
     { text: "STATUS: THINKING", dot: "#FFB347", pulse: true },
     { inMs: 500 },
   ),
-  SPEAKING: baseSpec("SPEAKING"),
+  // SPEAKING — hot core doing what v2's jaw did: intensity, ring breath and the nerves ride the
+  // avatar store's energy.mid (0 on the bench unless ?demo=1 feeds the synthetic phrases)
+  SPEAKING: delta(
+    "#FF7A1A",
+    {
+      coreIntensity: 1.2,
+      corePulsePeriod: 2,
+      plumeFraction: 1, // Ali's ×1.3: capped — the plume is built at LISTENING's count
+      plumeSpeed: 1.3,
+      neckPulseSpeed: 2,
+      contourScroll: 1.5,
+      goldBrightness: 1.1,
+      dustDrift: 1.2,
+    },
+    { text: "STATUS: SPEAKING", dot: "#FF7A1A", pulse: true },
+    { inMs: 400, energy: { coreIntensity: 0.8, ringBreathAmount: 1, neckBrightness: 1 } },
+  ),
   OFFLINE: baseSpec("OFFLINE"),
 };
 
