@@ -222,6 +222,9 @@ function delta(
   return { look: { ...LISTENING_LOOK, ...fields, coreColor: linearRgb(hex) }, hud, ...rest };
 }
 
+const WAKE_FROM = linearRgb("#0A3D7A"); // DORMANT's core
+const WAKE_PEAK = linearRgb("#FFE2B0"); // palette.coreHot
+
 export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
   // DORMANT — page load, or IDLE after 90 s: a sleeping core, deep blue, everything at rest
   DORMANT: delta(
@@ -255,7 +258,40 @@ export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
     },
     { text: "STATUS: IDLE", dot: sceneConfig.palette.line, pulse: false },
   ),
-  WAKING: baseSpec("WAKING"),
+  // WAKING — the 1.2 s one-shot (v2's WAKING_DURATION_S): the core flares from DORMANT's deep
+  // blue to white-hot at 0.6 s and settles to LISTENING's orange; every rate runs high for the
+  // whole sequence (the nerves light up first, the contour lines sweep upward ×6), then the
+  // normal 600 ms LISTENING-in tween brings them down. Reduced motion: evaluated at the end.
+  WAKING: delta(
+    sceneConfig.palette.core,
+    {
+      corePulsePeriod: 0.6,
+      ringBreathAmount: 3,
+      plumeFraction: 1, // Ali's ×1.5: capped — the plume is built at LISTENING's count
+      plumeSpeed: 2,
+      neckPulseSpeed: 4,
+      neckBrightness: 1.5,
+      contourScroll: 6,
+      goldBrightness: 1.3,
+      dustDrift: 2,
+    },
+    { text: "STATUS: WAKING", dot: "#FFFFFF", pulse: true },
+    {
+      inMs: 0,
+      sequenceMs: 1200,
+      sequence: (t01, out) => {
+        // 0 → 0.5: deep blue → white-hot, intensity 0.3 → 2.0; 0.5 → 1: → orange, intensity 1
+        const up = t01 < 0.5;
+        const k = easeInOutCubic(up ? t01 * 2 : (t01 - 0.5) * 2);
+        const a = up ? WAKE_FROM : WAKE_PEAK;
+        const b = up ? WAKE_PEAK : LISTENING_LOOK.coreColor;
+        out.coreColor[0] = a[0] + (b[0] - a[0]) * k;
+        out.coreColor[1] = a[1] + (b[1] - a[1]) * k;
+        out.coreColor[2] = a[2] + (b[2] - a[2]) * k;
+        out.coreIntensity = up ? 0.3 + 1.7 * k : 2 - k;
+      },
+    },
+  ),
   // the identity row: `sceneConfig.hud.text` is the LISTENING readout the scene shipped with
   LISTENING: {
     ...baseSpec("LISTENING"),
