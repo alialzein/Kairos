@@ -435,6 +435,37 @@ dust 8,000 · plume 5,000 · stars 400), mobile 91,821 — under Ali's ~300k. Fr
 RTX 5070 at 1280 × 720, vsync off: **p50 0.8 ms**, p95 1.3 ms (400 × 800 mobile-width
 window: 0.7 / 1.1 ms). WebGL2 fallback renders the same picture, no page errors.
 
+## Phase 13 (Ali, 2026-09-08) — final balance pass
+
+Still on PR #30, not merged until Ali approves the 13.3 screenshot. One commit + screenshot
+per item, `docs/screens/phase-13/`. p50 at 1080p and at 1.5× dpr reported after 13.3; if p50
+> 12 ms the 13.2/13.3 counts drop 30 %.
+
+1. **13.1 Bust contrast (reduce).** `13-1.png`. Line multiplier 1.4 → 1.0 (`lineBoost` 0,
+   bust only — particle brightnesses stay), lineWidth 0.04 → 0.03, halo alpha 0.9 → 0.45,
+   shell rim alpha 0.9 → 1.0 (the outline glow comes from particles, the halo mesh backs it),
+   core white-hot mix 40 % → 25 % of the radius. Dark navy between the lines again, orange core.
+
+2. **13.2 Mountain slopes → particle mass.** `13-2.png`. Edge alpha 0.10 → 0.05; slope dust
+   4,000 → 15,000 per side, size 0.008–0.015 per point, alpha 0.35, anchors drawn ∝ normalised
+   height (prefix sums + binary search, ε 1e-3 so the lowest rows are not empty: the higher
+   half of the nodes holds 71 % of the dust); nodes 200 × 60 → 230 × 70 per side (16,170;
+   `zStep` −0.06594 keeps the z range). Crest gold unchanged. 65,340 landscape sprites, 189 ms
+   to generate; desktop budget 213,741.
+
+3. **13.3 Ambient around the head.** `13-3.png`. Dust 8,000 → 20,000 with density falling off
+   from the head centre (`dust.ambient.focus`: a box candidate at distance d is kept with
+   probability 1 / (1 + (d / falloff)²), falloff 1; rejection sampling, acceptance 0.21, the
+   0–0.5 shell 5.9× denser than the 2–3 shell) — misty inside the rings, sparse corners. Crown
+   plume 5,000 → 7,500, same cone.
+
+Budget after 13.3 (`pointBudget()`): desktop **228,241** sprites (landscape 65,340 · shell
+120,000 · rings 13,500 · neck 1,501 · dust 20,000 · plume 7,500 · stars 400), mobile 114,191.
+Frame time on the RTX 5070, vsync off, every layer on: **1920 × 1080 at dpr 1: p50 0.8 ms /
+p95 1.1 ms; at dpr 1.5: p50 1.2 ms / p95 1.4 ms** — far under Ali's 12 ms bar, so the 13.2 /
+13.3 counts stay. (This Chrome session's rAF is capped at 60 Hz; with vsync on every
+measurement reads 16.7 ms regardless of content.)
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
