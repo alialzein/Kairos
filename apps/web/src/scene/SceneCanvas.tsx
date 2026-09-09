@@ -13,6 +13,7 @@ import { Hud } from "./Hud";
 import { Landscape } from "./Landscape";
 import { NeckCircuit } from "./NeckCircuit";
 import { Rings } from "./Rings";
+import { SceneStateDriver } from "./SceneStateDriver";
 import { Stars } from "./Stars";
 import { currentVerticalFov, verticalFov } from "./framing";
 import { dprFor, sceneMotionEnabled } from "./motion";
@@ -235,6 +236,9 @@ export function SceneCanvas({
         {layers.dust ? <Dust /> : null}
         {layers.landscape ? <Landscape /> : null}
         {layers.post ? <Effects /> : null}
+        {/* b5-32: the seven-state driver — after the layers in the tree, but its useFrame runs
+            first (priority −1), so every layer reads this frame's look */}
+        <SceneStateDriver />
         <FrameTicker waitForBust={layers.bust} onReady={onReady} />
         <RendererLifecycle />
       </Canvas>

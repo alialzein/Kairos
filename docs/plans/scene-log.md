@@ -497,6 +497,49 @@ ignored in production builds (`NODE_ENV`), the layer params stay for CI's smoke 
 fallback probe. Frame time at that scale, 1920 × 1080, dpr 1, vsync off: **p50 0.8 ms**,
 p95 1.1 ms. Desktop budget unchanged at 228,241 sprites.
 
+## Seven-state wiring (Ali, 2026-09-08) — follow-up PR 1, branch `b5-32-states`
+
+Step A: the state table — names, order and triggers from look v2's machine
+(`packages/shared/src/avatar.ts`, `avatar/state/machine.ts`; timings `packages/config/src/avatar.ts`),
+every state a delta from LISTENING (frozen as merged) on existing knobs only: core colour /
+intensity / pulse, ring breathing, plume fraction / speed, neck pulse speed / brightness, contour
+scroll, mountain gold brightness, dust drift, HUD text + dot. Approved with three changes: IDLE
+core ×0.45 in dim amber #C97F3A with 6 s ring breathing ("warm but resting" vs LISTENING "lit");
+DORMANT → OFFLINE uses the normal OFFLINE-in transition; OFFLINE keeps its 0.5 s alarm flicker
+but is a steady red core under reduced motion. The three v2 gaps (speech-end, failure/recovery,
+LISTENING → IDLE decay) stay out — listed in STATUS under "Brain integration follow-ups".
+
+Step B: `scene/states.ts` — a pure `SceneStateEngine` (tween ≤ 600 ms ease-in-out cubic; WAKING a
+1.2 s one-shot sequence; OFFLINE a 400 ms freeze then 600 ms; SPEAKING adds `energy.mid`; reduced
+motion = instant, no flicker) → `stateUniforms.ts` (accumulated phases so a rate change never
+jumps: `pulsePhase`, `scrollOffset`, `plumeClock`) → `SceneStateDriver` (one `useFrame`, no
+allocations) → the layers multiply their config values by the uniforms (identity = the merged
+look). HUD follows `useAvatarStore.state`. Bench: `?state=NAME`, Space / arrows cycle, `?demo=1`
+auto-cycles DORMANT → WAKING → LISTENING → THINKING → SPEAKING → IDLE → OFFLINE → IDLE at 5 s,
+`?hold=<s>` pins the clock for stills. Stills in `docs/screens/states/`, one commit per state.
+
+Stills (`docs/screens/states/`, one commit per state, `?state=NAME` on the bench):
+- `listening.png` — the identity row; pixel-matched against main with motion off (max delta 16/255).
+- `dormant.png` — deep blue core at ×0.3, 6 s pulse, breathing/scroll/neck pulse off, plume 20 %.
+- `idle.png` — dim amber #C97F3A at ×0.45 (Ali's change: "warm but resting"), 4 s pulse, 6 s breath.
+- `waking.png` (`&hold=0.5`) — mid-flare: white-hot ×2 at 0.6 s, HUD `ASSEMBLING… 42%`; every rate
+  high for the 1.2 s (contour scroll ×6 = the reveal sweep), then the 600 ms LISTENING settle.
+- `thinking.png` — amber #FFB347 ×1.3, 1.2 s throb at double amplitude (the still caught a trough).
+- `speaking.png` — hot #FF7A1A ×1.2; on the bench energy is 0 unless `?demo=1` feeds the synthetic
+  phrases (the probe read core intensity 2.0 mid-phrase).
+- `offline.png` (`&hold=1.6`) — after the 400 ms freeze and 600 ms tween: red #FF4D4D ×0.5 with
+  the 0.5 s alarm; steady red under reduced motion because the driver never advances the phase.
+
+Two caps against Ali's table: WAKING's plume ×1.5 and SPEAKING's ×1.3 are clamped to the built
+count (the plume is built at LISTENING's 7,500 and shown as a fraction); the rest is verbatim.
+Reduced motion keeps the pulse amplitude and freezes the phase, so the still core stays at the
+merged 1 − pulseAmount instead of brightening.
+
+Verification (2026-09-09): unit tests 234 (20 engine tests), typecheck, lint (the known warning),
+prettier; production build + the scene smoke in CI mode 3/3 (boot + keeps rendering, layer params,
+`?state=OFFLINE` HUD); `?demo=1` probed for 42 s on the dev server: DORMANT → WAKING → LISTENING →
+THINKING → SPEAKING → IDLE → OFFLINE → IDLE → (loop) at 5 s per state, no page errors.
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot
