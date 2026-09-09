@@ -334,7 +334,25 @@ export const SCENE_STATES: Record<SceneStateName, SceneStateSpec> = {
     { text: "STATUS: SPEAKING", dot: "#FF7A1A", pulse: true },
     { inMs: 400, energy: { coreIntensity: 0.8, ringBreathAmount: 1, neckBrightness: 1 } },
   ),
-  OFFLINE: baseSpec("OFFLINE"),
+  // OFFLINE — a failure from any state: 400 ms freeze (every rate 0, v2's freeze), then the red
+  // look with a 0.5 s alarm flicker; under reduced motion the phase never advances → steady red
+  OFFLINE: delta(
+    "#FF4D4D",
+    {
+      coreIntensity: 0.5,
+      corePulsePeriod: 0.5,
+      ringBreathAmount: 0,
+      plumeFraction: 0.1,
+      plumeSpeed: 0.3,
+      neckPulseSpeed: 0,
+      neckBrightness: 0.3,
+      contourScroll: 0,
+      goldBrightness: 0.3,
+      dustDrift: 0.2,
+    },
+    { text: "STATUS: OFFLINE", dot: "#FF4D4D", pulse: false },
+    { inMs: 600, freezeMs: 400 },
+  ),
 };
 
 /**
