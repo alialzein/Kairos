@@ -1,8 +1,8 @@
 {
   "backend": "webgl",
-  "tier": "mid",
-  "p95": 3139.51,
-  "p50": 1699.55,
-  "recordedAt": "2026-09-09T11:19:12.255Z",
+  "profile": "scene:all-layers:LISTENING",
+  "p95": 6435.09,
+  "p50": 3186.2,
+  "recordedAt": "2026-09-09T18:02:17.880Z",
   "runner": "ubuntu-latest"
 }
