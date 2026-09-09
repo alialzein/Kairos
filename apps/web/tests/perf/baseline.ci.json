@@ -1,8 +1,8 @@
 {
-  "backend": "webgpu",
+  "backend": "webgl",
   "tier": "mid",
-  "p95": 18.11,
-  "p50": 16.7,
-  "recordedAt": "2026-09-06T10:44:50.761Z",
+  "p95": 3139.51,
+  "p50": 1699.55,
+  "recordedAt": "2026-09-09T11:19:12.255Z",
   "runner": "ubuntu-latest"
 }
