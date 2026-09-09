@@ -582,3 +582,61 @@ LAN firewall rules, see STATUS).
 4. Gold ridge edges: single tallest ridge (plan rule) or spread per crest?
 5. Where to mount it: `/bench/scene` and the playground only for now; swapping the owner home's
    avatar to this scene means giving it the seven states (the plan is a static LISTENING look).
+
+## Brain-integration dispatches (2026-09-09) — branch `b5-35-brain-dispatch`
+
+The three gaps STATUS listed under "Brain integration follow-ups" — the seven-state table has the
+edges, nothing dispatched them. All three are local stand-ins with the same shape the brain hookup
+(Phase A2) will keep; none of them changes the scene or the canvas.
+
+**SPEECH_END (LISTENING → THINKING).** `avatar/audio/speechEnd.ts` is a pure `SpeechEndDetector`
+over the smoothed mic `energy.mid`: `mid >= SPEECH_END.threshold` for `minSpeechS` confirms an
+utterance, then `mid < threshold` for `silenceS` ends it, returning true exactly once. Values
+(`packages/config/src/avatar.ts`): threshold 0.08, minSpeechS 0.3, silenceS 0.8. Why those: docs/06
+§4 feeds LISTENING from the mic's band energy and docs/07-voice-spec.md §1 asks for a 300 ms VAD
+confirmation of speech after the wake phrase, so the confirm window reuses that number; 0.08 sits
+above the analyser's room-tone floor on the smoothed 0..1 mid band, and 0.8 s of silence is the
+usual end-of-turn pause without cutting into a mid-sentence breath. `useSpeechEnd` runs it from
+`useAvatarStore.subscribe` — not the selector hook — because energy lands every animation frame and
+a hook would re-render the stage, and with it the canvas's parent, 60 times a second; the detector
+is reset whenever the Avatar leaves LISTENING.
+
+**The mic.** `SceneStage` now calls `useEnergyInput(state === "LISTENING" ? "mic" : "none", null)`:
+open only while the Avatar is listening, never in DORMANT and never mid-turn. `useEnergyInput` was
+hardened for that — a failed `setup()` (getUserMedia denied, no capture device, no `AudioContext`)
+is caught, warned about once per page and left at ZERO energy instead of becoming an unhandled
+rejection, and a device that finishes opening after teardown is handed straight back. Without that
+the e2e (headless Chromium, no microphone, run fails on any page error) would go red the moment a
+click-to-wake reached LISTENING.
+
+**FAILURE / RECOVER (OFFLINE).** docs/03 §7: a brain whose Reasoner is unavailable puts the UI in
+OFFLINE. The brain has no CORS middleware, so the browser cannot call its `/health` — the poll goes
+through a new Next route handler, `app/api/health/route.ts` (`force-dynamic`), which probes
+`BRAIN_URL/health` server-side with `cache: "no-store"` and a 3 s `AbortSignal.timeout`, and answers
+`{ configured, ok }` — never the URL itself. The fetch is `lib/health/probe.ts`'s
+`probeBrain(fetchImpl, url)` so it is unit-testable with a fake fetch (ok body / non-200 / wrong
+body / non-JSON / refused / aborted). `useBrainHealth` polls it every `HEALTH_POLL.intervalS` (15 s,
+first poll immediate), skips a poll while `document.hidden` (a throttled background tab is not
+evidence that the brain is down), stops for the page's life when the route says `configured: false`,
+and feeds `HealthTracker`: FAILURE once after 2 consecutive bad probes, RECOVER on the first good
+one afterwards. Two, not one, so a single dropped request cannot dissolve the Avatar. Everything
+lives in refs — a poll never re-renders the stage. Only a *parsed* answer moves the tracker: the
+auth proxy's redirect to `/login`, a 500 or an offline page say something about the web app, not
+about the brain, and must not force OFFLINE.
+
+**LISTENING → IDLE.** `avatar/state/timers.ts` (`timedEventFor`) now holds all three timed edges of
+docs/06 §3 as data — WAKING → WAKE_DONE (1.2 s), IDLE → INACTIVITY (90 s) and the new LISTENING →
+INACTIVITY (`LISTENING_TIMEOUT_S` = 30 s). `useAvatarState` reads the table and keeps its one
+non-table rule unchanged: a THINK arriving during DORMANT/WAKING is queued and re-dispatched when
+the wake completes.
+
+Deviations / notes: `/api/health` deliberately sits behind the auth proxy like every other
+non-public path, so on the public bench (`/bench/scene?stage=1`) and in the e2e the poll is
+redirected to `/login`; the client ignores that unreadable answer, and the server logs one
+"NEXT_PUBLIC_SUPABASE_URL … not set" line per page in environments with no Supabase env (CI and any
+worktree without `.env.local`). Tests stay green; the noise is pre-existing proxy behaviour, not new
+failure handling.
+
+Open question for Ali: `LISTENING_TIMEOUT_S` = 30 s and the VAD thresholds (0.08 / 0.3 s / 0.8 s)
+are proposed defaults — docs/06 §3 numbers only IDLE's 90 s and the specs give no energy threshold.
+Both are one-line changes in `packages/config/src/avatar.ts`.
