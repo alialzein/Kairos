@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
-import { probeBrain } from "@/lib/health/probe";
+import { probeBrain, type HealthResponse } from "@/lib/health/probe";
 
 /** never cached: the answer is a live probe, and a cached "ok" would hide an OFFLINE brain */
 export const dynamic = "force-dynamic";
-
-export interface HealthResponse {
-  /** false when `BRAIN_URL` is unset — the client then stops polling for the page's life */
-  configured: boolean;
-  /** null when not configured, otherwise the probe result */
-  ok: boolean | null;
-}
 
 /**
  * The browser's only route to the brain's `/health`: the brain has no CORS middleware, so the page

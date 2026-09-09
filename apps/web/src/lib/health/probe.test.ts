@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HEALTH_POLL } from "@twin/config";
-import { probeBrain } from "./probe";
+import { parseHealthResponse, probeBrain } from "./probe";
 
 type Call = { url: string; init: RequestInit | undefined };
 
@@ -62,5 +62,23 @@ describe("probeBrain", () => {
   it("is not ok when the request aborts on the timeout", async () => {
     const f = fakeFetch(() => Promise.reject(new DOMException("timed out", "TimeoutError")));
     await expect(probeBrain(f.impl, "http://localhost:8000")).resolves.toBe(false);
+  });
+});
+
+describe("parseHealthResponse", () => {
+  it("accepts the two shapes the route sends", () => {
+    expect(parseHealthResponse({ configured: false, ok: null })).toEqual({
+      configured: false,
+      ok: null,
+    });
+    expect(parseHealthResponse({ configured: true, ok: false })).toEqual({
+      configured: true,
+      ok: false,
+    });
+  });
+
+  it("rejects anything else", () => {
+    const bad: unknown[] = [null, "ok", 1, {}, { configured: "yes", ok: true }, { configured: 1 }];
+    for (const body of bad) expect(parseHealthResponse(body)).toBeNull();
   });
 });
