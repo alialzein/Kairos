@@ -1,5 +1,5 @@
-import { AvatarStage } from "@/avatar/AvatarStage";
+import { SceneStage } from "@/scene/SceneStage";
 
 export default function Home() {
-  return <AvatarStage />;
+  return <SceneStage />;
 }

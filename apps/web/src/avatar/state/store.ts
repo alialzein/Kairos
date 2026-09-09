@@ -1,63 +1,27 @@
 import { create } from "zustand";
 import type { AvatarState } from "@twin/shared";
-import type { Tier } from "@twin/config";
 import { ZERO_ENERGY, type Energy } from "../audio/energy";
 import { transition, type AvatarEvent } from "./machine";
 
-export interface PointerState {
-  /** world-space x/y on the z = 0 plane */
-  x: number;
-  y: number;
-  active: boolean;
-  /** +1 repel (hover), -1 attract (long press) */
-  strength: number;
-}
-export interface FrameSummary {
-  p50: number;
-  p95: number;
-  count: number;
-}
-/** Live overrides from the playground; every field optional, applied on top of AVATAR_STATES. */
-export interface Tuning {
-  turbulence?: number;
-  brightness?: number;
-  spring?: number;
-  damping?: number;
-  noiseScale?: number;
-  noiseAmp?: number;
-  size?: number;
-  bloomStrength?: number;
-  bloomThreshold?: number;
-  vortex?: number;
-  pointerRadius?: number;
-}
-export type Backend = "webgpu" | "webgl";
-
+/**
+ * The seven-state source of truth (docs/06 §3): the state machine's current state, its entry
+ * time, a bounded log, the audio energy that modulates LISTENING/SPEAKING and WAKING's assembly
+ * progress. Read per frame by the scene's `SceneStateDriver`, by `scene/Hud` and by the bench.
+ * Renderer telemetry (backend, frame stats, errors) lives in `scene/store.ts`; the look v2 fields
+ * (tier, pointer, tuning) went with that renderer (follow-up 3).
+ */
 export interface AvatarStore {
   state: AvatarState;
+  /** `performance.now()` at the last state change (WAKING's assembly clock) */
   since: number;
+  /** the last 20 states, oldest first */
   log: AvatarState[];
-  tier: Tier | null;
-  backend: Backend | null;
-  /** renderer failure, e.g. a lost WebGPU device (parity with the scene store) */
-  error: string | null;
-  ready: boolean;
   energy: Energy;
-  pointer: PointerState;
-  frames: FrameSummary;
-  tuning: Tuning;
   /** linear WAKING assembly progress 0..1 (0 outside WAKING) — drives the HUD "ASSEMBLING… NN%" */
   assemble: number;
   dispatch: (e: AvatarEvent) => void;
   setState: (s: AvatarState) => void;
-  setTier: (t: Tier) => void;
-  setBackend: (b: Backend) => void;
-  setError: (e: string | null) => void;
-  setReady: (r: boolean) => void;
   setEnergy: (e: Energy) => void;
-  setPointer: (p: Partial<PointerState>) => void;
-  setFrames: (f: FrameSummary) => void;
-  setTuning: (t: Tuning) => void;
   setAssemble: (a: number) => void;
   reset: () => void;
 }
@@ -67,14 +31,7 @@ const initial = () => ({
   state: "DORMANT" as AvatarState,
   since: now(),
   log: ["DORMANT" as AvatarState],
-  tier: null,
-  backend: null,
-  error: null,
-  ready: false,
   energy: ZERO_ENERGY,
-  pointer: { x: 0, y: 0, active: false, strength: 1 },
-  frames: { p50: 0, p95: 0, count: 0 },
-  tuning: {},
   assemble: 0,
 });
 
@@ -85,14 +42,7 @@ export const useAvatarStore = create<AvatarStore>()((set, get) => ({
     if (next !== get().state) get().setState(next);
   },
   setState: (s) => set((st) => ({ state: s, since: now(), log: [...st.log, s].slice(-20) })),
-  setTier: (tier) => set({ tier }),
-  setBackend: (backend) => set({ backend }),
-  setError: (error) => set({ error }),
-  setReady: (ready) => set({ ready }),
   setEnergy: (energy) => set({ energy }),
-  setPointer: (p) => set((st) => ({ pointer: { ...st.pointer, ...p } })),
-  setFrames: (frames) => set({ frames }),
-  setTuning: (t) => set((st) => ({ tuning: { ...st.tuning, ...t } })),
   setAssemble: (assemble) => set({ assemble }),
   reset: () => set(initial()),
 }));

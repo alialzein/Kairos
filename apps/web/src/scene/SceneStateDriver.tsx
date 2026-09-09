@@ -58,8 +58,8 @@ export function SceneStateDriver() {
     return useAvatarStore.subscribe((s, prev) => {
       if (s.state === prev.state) return;
       engine.set(s.state, performance.now());
-      // `useAvatarState` drives `assemble` when the app runs it; on the bench nothing does, so
-      // the driver takes it over for a wake that arrives with the progress still at 0
+      // nothing else writes `assemble` (look v2's canvas did, until follow-up 3), so the driver
+      // takes it over for a wake that arrives with the progress still at 0
       ownsAssemble.current = s.state === "WAKING" && s.assemble === 0;
       assembleWrittenMs.current = 0;
       if (prev.state === "WAKING" && s.assemble !== 0) useAvatarStore.getState().setAssemble(0);

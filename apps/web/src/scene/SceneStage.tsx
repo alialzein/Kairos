@@ -2,14 +2,13 @@
 import dynamic from "next/dynamic";
 import { memo, useCallback, useRef, useState } from "react";
 import { identity } from "@twin/config";
-import { Hud } from "./Hud";
-import { StatusRing } from "./StatusRing";
-import { runDemoTurn } from "./demo/driver";
-import { playWakeCue } from "./audio/cue";
-import { useAvatarState } from "./useAvatarState";
-import { useAvatarStore } from "./state/store";
+import { playWakeCue } from "@/avatar/audio/cue";
+import { runDemoTurn } from "@/avatar/demo/driver";
+import { useAvatarStore } from "@/avatar/state/store";
+import { useAvatarState } from "@/avatar/useAvatarState";
+import type { Layers } from "./sceneConfig";
 
-const AvatarCanvas = dynamic(() => import("./AvatarCanvas").then((m) => m.AvatarCanvas), {
+const SceneCanvas = dynamic(() => import("./SceneCanvas").then((m) => m.SceneCanvas), {
   ssr: false,
 });
 
@@ -28,22 +27,53 @@ function demoOpts() {
 }
 
 /**
- * The canvas must sit under a component that never re-renders (see docs/plans/phase-b5-ledger.md,
- * Task 7): the stage re-renders on every ribbon word and state change, so the canvas gets its own
- * memoized layer whose props are stable callbacks.
+ * Canvas-isolation rule (docs/plans/phase-b5-ledger.md, Task 7): the scene canvas must sit under
+ * a component that never re-renders — the stage re-renders on every ribbon word and state change,
+ * so the canvas gets its own memoized layer whose props are stable callbacks. The click-to-wake
+ * handler lives on the wrapper: the canvas element's clicks bubble to it, and nothing inside the
+ * Canvas subscribes to React state for it.
  */
 const CanvasLayer = memo(function CanvasLayer({
+  layers,
+  forceWebGL,
   onWake,
   onReady,
 }: {
+  layers: Partial<Layers> | undefined;
+  forceWebGL: boolean;
   onWake: () => void;
   onReady: () => void;
 }) {
-  return <AvatarCanvas className="absolute inset-0" onWake={onWake} onReady={onReady} />;
+  return (
+    <div className="absolute inset-0" data-stage-canvas onClick={onWake}>
+      <SceneCanvas
+        className="h-full w-full"
+        layers={layers}
+        forceWebGL={forceWebGL}
+        onReady={onReady}
+      />
+    </div>
+  );
 });
 
-/** The owner's home: the Avatar, a status ring, a two-line transcript ribbon and a chat drawer that runs demo turns. */
-export function AvatarStage({ demo = false }: { demo?: boolean }) {
+/**
+ * The owner's home (follow-up 3 of the Neural Bust, replacing look v2's AvatarStage): the scene
+ * canvas with its own HUD, a two-line transcript ribbon and a chat drawer that runs demo turns
+ * until the Brain arrives (Phase A2). Click the avatar to wake it (WAKE; barge-in while SPEAKING).
+ */
+export function SceneStage({
+  demo = false,
+  forceWebGL = false,
+  layers,
+}: {
+  /** run one demo turn as soon as the scene is ready (the bench's `?stage=1&demo=1`) */
+  demo?: boolean;
+  /** WebGL2 backend (the bench's `?webgl=1`; CI) */
+  forceWebGL?: boolean;
+  /** per-layer overrides (the bench's `only` / `off`); MUST be referentially stable — the home
+   *  passes nothing and renders every layer */
+  layers?: Partial<Layers>;
+}) {
   const { state, send } = useAvatarState();
   const setEnergy = useAvatarStore((s) => s.setEnergy);
   const [ribbon, setRibbon] = useState<string[]>([]);
@@ -89,23 +119,22 @@ export function AvatarStage({ demo = false }: { demo?: boolean }) {
   return (
     <section
       data-theme="dark"
+      data-stage="scene"
       data-state={state}
       className="relative flex h-dvh w-full flex-col overflow-hidden bg-twin-bg text-twin-fg"
     >
-      <CanvasLayer onWake={wake} onReady={onReady} />
-      <header className="relative z-10 flex items-start justify-between p-4">
-        <StatusRing state={state} />
-        <div className="flex items-start gap-4">
-          <Hud />
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="rounded-full border border-white/20 px-3 py-1 text-xs"
-            aria-expanded={open}
-          >
-            {open ? "close" : "chat"}
-          </button>
-        </div>
+      <CanvasLayer layers={layers} forceWebGL={forceWebGL} onWake={wake} onReady={onReady} />
+      {/* the scene's own HUD (top-right, inside the canvas container) is the status readout;
+          the stage adds only the chat toggle, top-left so the two never overlap */}
+      <header className="relative z-10 flex items-start justify-start p-4">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="rounded-full border border-white/20 px-3 py-1 text-xs"
+          aria-expanded={open}
+        >
+          {open ? "close" : "chat"}
+        </button>
       </header>
       <div className="relative z-10 mt-auto space-y-1 p-4 font-mono text-sm" data-ribbon>
         {ribbon.length === 0 ? (

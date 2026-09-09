@@ -22,6 +22,9 @@ import { useSceneStore } from "@/scene/store";
 const SceneCanvas = dynamic(() => import("@/scene/SceneCanvas").then((m) => m.SceneCanvas), {
   ssr: false,
 });
+const SceneStage = dynamic(() => import("@/scene/SceneStage").then((m) => m.SceneStage), {
+  ssr: false,
+});
 
 declare global {
   interface Window {
@@ -36,6 +39,8 @@ declare global {
       applied: string[];
       /** b5-32: the avatar state the scene is rendering */
       state: string;
+      /** the store's last 20 states, oldest first (the stage's demo-turn e2e reads it) */
+      log: string[];
       /** b5-32: the blended look this frame. One object, updated in place — read fields, never
        *  hold a reference expecting a snapshot. */
       look: SceneLook;
@@ -51,6 +56,10 @@ const DEMO_ENERGY_INTERVAL_MS = 90;
  *  b5-32 adds the seven-state controls: `?state=NAME` previews one state, Space / ArrowRight /
  *  ArrowLeft cycle `STATE_ORDER`, `?demo=1` runs `DEMO_SEQUENCE` at `DEMO_STEP_MS`, and
  *  `?hold=<seconds>` pins the state engine's clock for a reproducible still.
+ *  Follow-up 3 adds `?stage=1`: the owner home's `SceneStage` (ribbon, chat drawer, click-to-wake)
+ *  on the public bench, starting DORMANT like the home; with `&demo=1` it runs one demo turn on
+ *  ready instead of the state cycle (the B5.7 e2e gate). The stage's `useAvatarState` owns the
+ *  timed transitions there, so the state-cycling keys and the `?demo=1` loop are off.
  *  Publishes `window.__twinScene` for Playwright and the screenshot scripts. */
 export function BenchScene({
   query,
@@ -59,6 +68,7 @@ export function BenchScene({
   state,
   demo,
   hold,
+  stage,
 }: {
   query: LayerQuery;
   webgl: boolean;
@@ -71,6 +81,8 @@ export function BenchScene({
   demo?: boolean;
   /** `?hold=2.5` — pin the engine clock this many seconds after the state entry */
   hold?: string;
+  /** `?stage=1` — render the owner home's stage instead of the bare canvas */
+  stage?: boolean;
 }) {
   // stable for the life of the page: the canvas parent must not re-render (ledger, Task 7)
   const layers = useMemo(() => layersFromQuery(query), [query]);
@@ -98,8 +110,10 @@ export function BenchScene({
   // default because it is the merged look: without `?state=` the bench renders what shipped.
   useEffect(() => {
     const parsed = AvatarState.safeParse(state);
-    useAvatarStore.getState().setState(parsed.success ? parsed.data : "LISTENING");
-  }, [state]);
+    // the stage starts where the home does — the store's initial DORMANT, not logged twice
+    if (parsed.success) useAvatarStore.getState().setState(parsed.data);
+    else if (!stage) useAvatarStore.getState().setState("LISTENING");
+  }, [state, stage]);
 
   // `?hold=` lives in the scene store so the driver can read it per frame without a prop
   useEffect(() => {
@@ -111,7 +125,7 @@ export function BenchScene({
   // keyboard: cycle the states. Refs and `getState()` only — a re-render here would re-run the
   // canvas's `gl` factory (ledger, Task 7).
   useEffect(() => {
-    if (demo) return undefined;
+    if (demo || stage) return undefined;
     const onKey = (e: KeyboardEvent) => {
       const step = e.key === "ArrowLeft" ? -1 : e.key === " " || e.key === "ArrowRight" ? 1 : 0;
       if (!step) return;
@@ -122,12 +136,12 @@ export function BenchScene({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [demo]);
+  }, [demo, stage]);
 
   // `?demo=1`: DORMANT → WAKING → … → OFFLINE → IDLE, looping, with synthetic speech energy while
   // SPEAKING so the core actually moves.
   useEffect(() => {
-    if (!demo) return undefined;
+    if (!demo || stage) return undefined;
     let i = 0;
     const enter = () => {
       const next = DEMO_SEQUENCE[i % DEMO_SEQUENCE.length];
@@ -150,7 +164,7 @@ export function BenchScene({
       clearInterval(energy);
       useAvatarStore.getState().setEnergy(ZERO_ENERGY);
     };
-  }, [demo]);
+  }, [demo, stage]);
 
   useEffect(() => {
     const publish = () => {
@@ -165,6 +179,7 @@ export function BenchScene({
         layers,
         applied,
         state: useAvatarStore.getState().state,
+        log: useAvatarStore.getState().log,
         look: published.current,
       };
     };
@@ -182,7 +197,11 @@ export function BenchScene({
     };
   }, [layers, applied]);
 
-  return (
+  return stage ? (
+    <main data-theme="dark" data-bench="scene" data-stage="1" className="fixed inset-0">
+      <SceneStage demo={demo} forceWebGL={webgl} layers={layers} />
+    </main>
+  ) : (
     <main data-theme="dark" data-bench="scene" className="fixed inset-0">
       <SceneCanvas layers={layers} forceWebGL={webgl} className="h-full w-full" />
     </main>

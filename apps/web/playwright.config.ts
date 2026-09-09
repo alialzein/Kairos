@@ -33,7 +33,7 @@ export default defineConfig({
     // is lost ~100 ms after creation (see tests/helpers/benchUrl.ts), and `?webgl=1` is the same
     // backend the specs use there. Harmless locally — it only decides which backend this one probe
     // page renders with, and nothing asserts on it.
-    url: `${BASE}/bench/avatar?tier=low&webgl=1`,
+    url: `${BASE}/bench/scene?only=background,hud&webgl=1`,
     reuseExistingServer: !CI,
     timeout: 180_000,
   },

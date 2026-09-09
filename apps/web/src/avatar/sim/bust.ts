@@ -1,7 +1,13 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { BufferGeometry, Mesh } from "three";
-import { boundsOf } from "./sampler";
-import type { BustMesh } from "./targets/humanoid";
+import { boundsOf, type Bounds } from "./sampler";
+
+/** the repo's bust mesh (`public/avatar/bust.glb`, built by `scripts/build-bust.ts`) as flat arrays */
+export interface BustMesh {
+  positions: Float32Array;
+  indices: Uint32Array;
+  bounds: Bounds;
+}
 
 export async function loadBust(url = "/avatar/bust.glb"): Promise<BustMesh> {
   const gltf = await new GLTFLoader().loadAsync(url);
