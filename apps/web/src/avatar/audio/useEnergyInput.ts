@@ -5,7 +5,19 @@ import { createEnergySource, fileSource, micSource, type EnergySource } from "./
 import { energyForMode, type EnergyMode } from "./energyMode";
 import { ZERO_ENERGY } from "./energy";
 
-/** Feeds the store's energy from a synthetic envelope, an audio file, or the microphone. */
+/** one warning per page: the owner home asks for the mic on every LISTENING, and a denied mic
+ *  (or a machine without one — headless CI) must not fill the console */
+let warnedOnce = false;
+
+/**
+ * Feeds the store's energy from a synthetic envelope, an audio file, or the microphone.
+ *
+ * Opening an input can fail for ordinary reasons — getUserMedia denied, no capture device, no
+ * AudioContext (an unsupported or locked-down browser). None of those is an error the page can
+ * act on, so the failure is warned about once and the Avatar simply stays at ZERO energy; it must
+ * never surface as an unhandled rejection (the e2e fails the run on any page error, and CI has no
+ * microphone at all).
+ */
 export function useEnergyInput(mode: EnergyMode, file: File | null): void {
   const setEnergy = useAvatarStore((s) => s.setEnergy);
   const ctxRef = useRef<AudioContext | null>(null);
@@ -19,7 +31,14 @@ export function useEnergyInput(mode: EnergyMode, file: File | null): void {
 
     const ctx = () => (ctxRef.current ??= new AudioContext());
 
-    const setup = async () => {
+    const release = () => {
+      source?.dispose();
+      source = null;
+      stop?.();
+      stop = null;
+    };
+
+    const open = async () => {
       if (mode === "file" && file) {
         const f = await fileSource(ctx(), file);
         source = createEnergySource(ctx(), f.node);
@@ -30,7 +49,26 @@ export function useEnergyInput(mode: EnergyMode, file: File | null): void {
         source = createEnergySource(ctx(), m.node);
         stop = m.stop;
       }
-      if (cancelled) return;
+    };
+
+    const setup = async () => {
+      try {
+        await open();
+      } catch (err) {
+        // denied / no device / no AudioContext — stay silent, never reject
+        if (!warnedOnce) {
+          warnedOnce = true;
+          console.warn(`[avatar] ${mode} energy input unavailable; staying at zero energy`, err);
+        }
+        release();
+        setEnergy(ZERO_ENERGY);
+        return;
+      }
+      // the effect was torn down while the device was opening: hand it straight back
+      if (cancelled) {
+        release();
+        return;
+      }
       const tick = () => {
         const live = source ? source.read() : null;
         setEnergy(energyForMode(mode, (performance.now() - t0) / 1000, live));
@@ -44,8 +82,7 @@ export function useEnergyInput(mode: EnergyMode, file: File | null): void {
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      source?.dispose();
-      stop?.();
+      release();
       setEnergy(ZERO_ENERGY);
     };
   }, [mode, file, setEnergy]);

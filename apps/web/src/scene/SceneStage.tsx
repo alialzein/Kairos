@@ -3,7 +3,10 @@ import dynamic from "next/dynamic";
 import { memo, useCallback, useRef, useState } from "react";
 import { identity } from "@twin/config";
 import { playWakeCue } from "@/avatar/audio/cue";
+import { useEnergyInput } from "@/avatar/audio/useEnergyInput";
+import { useSpeechEnd } from "@/avatar/audio/useSpeechEnd";
 import { runDemoTurn } from "@/avatar/demo/driver";
+import { useBrainHealth } from "@/avatar/health/useBrainHealth";
 import { useAvatarStore } from "@/avatar/state/store";
 import { useAvatarState } from "@/avatar/useAvatarState";
 import type { Layers } from "./sceneConfig";
@@ -81,6 +84,14 @@ export function SceneStage({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const audio = useRef<AudioContext | null>(null);
+
+  // The three brain-facing inputs. None of them re-renders this component (health polls in refs,
+  // speech-end subscribes to the store outside React, the mic writes energy the same way the demo
+  // driver does), so the memoized CanvasLayer below keeps its stable props.
+  useBrainHealth(send);
+  useSpeechEnd(send);
+  // the mic is open only while the Avatar is actually listening — never in DORMANT, never mid-turn
+  useEnergyInput(state === "LISTENING" ? "mic" : "none", null);
 
   const pushRibbon = useCallback((line: string, replaceLast?: boolean) => {
     setRibbon((r) =>

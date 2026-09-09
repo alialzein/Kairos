@@ -163,3 +163,25 @@ export const WAKING_DURATION_S = 1.2;
 export const IDLE_TIMEOUT_S = 90;
 /** fraction of particles reserved for the CORE and SPINE sub-systems (docs/06 §2) */
 export const ROLE_SPLIT = { core: 0.05, spine: 0.02 } as const;
+
+/**
+ * LISTENING falls back to IDLE after this long with no speech. docs/06 §3 names only IDLE's 90 s
+ * ("90s no activity"); the spec's diagram has no number for the LISTENING → IDLE edge, so 30 s is
+ * a proposed default for Ali, not a spec value.
+ */
+export const LISTENING_TIMEOUT_S = 30;
+
+/**
+ * Local end-of-speech detection on the mic's `energy.mid` (docs/06 §4). `mid` >= `threshold` for at
+ * least `minSpeechS` counts as speech — docs/07-voice-spec.md §1 asks for a 300 ms VAD confirmation
+ * after the wake phrase, and this reuses that number — after which `mid` < `threshold` for
+ * `silenceS` ends the utterance. Proposed defaults: the real VAD arrives with the voice service.
+ */
+export const SPEECH_END = { threshold: 0.08, minSpeechS: 0.3, silenceS: 0.8 } as const;
+
+/**
+ * Browser-side polling of the brain through the web app's `/api/health` route (docs/03 §7: the
+ * brain's `/health` reporting the Reasoner unavailable puts the UI in OFFLINE). Two consecutive
+ * failures — not one — before FAILURE, so a single dropped request does not dissolve the Avatar.
+ */
+export const HEALTH_POLL = { intervalS: 15, failuresToOffline: 2, timeoutMs: 3000 } as const;

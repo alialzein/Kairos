@@ -25,7 +25,7 @@ coding only: push to `main`, then on the PC `git pull` and restart what changed.
 5. `git clone https://github.com/alialzein/Kairos.git` then `pnpm install --frozen-lockfile`.
 6. `.env` from `.env.example` (see "Prerequisite" below): `SUPABASE_JWT_SECRET` from `pnpm supabase status`,
    the reasoner block as shipped (`REASONER_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://host.docker.internal:11434`),
-   `OWNER_USER_IDS` after the first sign-in.
+   `OWNER_USER_IDS` after the first sign-in. `BRAIN_URL` is optional — see "Health poll" below.
 7. Windows Firewall: allow inbound TCP 3000, 54321 and 80 on the Private profile if the laptop or the
    phone should reach the PC.
 
@@ -122,6 +122,22 @@ created deliberately:
 On a cloud project, also turn off "Enable email signups" under Authentication → Providers once the
 owner account exists — `ALLOW_SIGNUP` only gates the app's own `signInWithOtp` call, not the Supabase
 project setting.
+
+## Health poll (`BRAIN_URL`)
+
+Optional, server-side only, and read by the web app — put it in `apps/web/.env.local` (it is in
+`.env.example` next to `ALLOW_SIGNUP`):
+
+```
+BRAIN_URL=http://localhost/brain     # through caddy, with the compose stack up
+BRAIN_URL=http://localhost:8000      # the brain run directly via uv
+```
+
+With it set, the owner home polls `/api/health` every 15 s; that route (and only that route — the
+brain sends no CORS headers, so the browser can never call it directly) probes `<BRAIN_URL>/health`
+and answers `{ configured, ok }`, never the URL. Two consecutive bad probes put the Avatar in
+OFFLINE, the next good one brings it back. Leave it unset and nothing is polled — OFFLINE is then
+only reachable from the scene bench (`/bench/scene?state=OFFLINE`).
 
 ## Scene bench (the avatar's tuning page)
 
