@@ -152,8 +152,9 @@ Public, no sign-in: http://localhost:3000/bench/avatar?tier=mid&state=SPEAKING (
 
 ## Avatar performance
 
-CI runs `apps/web/tests/perf/avatar.spec.ts` on SwiftShader (no GPU) and fails when p95 frame time regresses
+CI runs `apps/web/tests/perf/avatar.spec.ts` on SwiftShader WebGL2 (no GPU; `?webgl=1` — the runner's
+WebGPU device dies at start, so the baseline's backend is "webgl") and fails when p95 frame time regresses
 more than 15 % against `tests/perf/baseline.ci.json`. Re-record the baseline only after an intentional cost
 change: Actions → ci → "Run workflow" with `update_baseline` ticked, download the `avatar-baseline` artifact,
-commit it. Real fps numbers come from `/dev/avatar` on the PC (desktop gate: 60 fps at `ultra`) and on Ali's
+commit it (a re-record runs single-worker on the runner, like every CI run; local runs never write it). Real fps numbers come from `/dev/avatar` on the PC (desktop gate: 60 fps at `ultra`) and on Ali's
 phone (`?tier=mid`, gate: 30 fps).

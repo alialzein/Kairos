@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { avatarUrl } from "../helpers/benchUrl";
 
 test("a demo turn drives THINKING → SPEAKING → IDLE on the stage", async ({ page }) => {
-  await page.goto("/bench/avatar?tier=low&demo=1");
+  await page.goto(avatarUrl("tier=low&demo=1"));
   await page.waitForFunction(() => window.__twinAvatar?.ready === true, null, { timeout: 60_000 });
   await page.waitForFunction(
     () => {

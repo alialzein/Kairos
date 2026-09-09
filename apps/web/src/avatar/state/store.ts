@@ -39,6 +39,8 @@ export interface AvatarStore {
   log: AvatarState[];
   tier: Tier | null;
   backend: Backend | null;
+  /** renderer failure, e.g. a lost WebGPU device (parity with the scene store) */
+  error: string | null;
   ready: boolean;
   energy: Energy;
   pointer: PointerState;
@@ -50,6 +52,7 @@ export interface AvatarStore {
   setState: (s: AvatarState) => void;
   setTier: (t: Tier) => void;
   setBackend: (b: Backend) => void;
+  setError: (e: string | null) => void;
   setReady: (r: boolean) => void;
   setEnergy: (e: Energy) => void;
   setPointer: (p: Partial<PointerState>) => void;
@@ -66,6 +69,7 @@ const initial = () => ({
   log: ["DORMANT" as AvatarState],
   tier: null,
   backend: null,
+  error: null,
   ready: false,
   energy: ZERO_ENERGY,
   pointer: { x: 0, y: 0, active: false, strength: 1 },
@@ -83,6 +87,7 @@ export const useAvatarStore = create<AvatarStore>()((set, get) => ({
   setState: (s) => set((st) => ({ state: s, since: now(), log: [...st.log, s].slice(-20) })),
   setTier: (tier) => set({ tier }),
   setBackend: (backend) => set({ backend }),
+  setError: (error) => set({ error }),
   setReady: (ready) => set({ ready }),
   setEnergy: (energy) => set({ energy }),
   setPointer: (p) => set((st) => ({ pointer: { ...st.pointer, ...p } })),

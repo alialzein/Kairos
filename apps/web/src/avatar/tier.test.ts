@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { baseTier, frameBudgetMs, parseTierOverride, stepDown, tierFromProbe } from "./tier";
+import {
+  baseTier,
+  frameBudgetMs,
+  parseTierOverride,
+  parseWebGLOverride,
+  stepDown,
+  tierFromProbe,
+} from "./tier";
 
 describe("baseTier", () => {
   const desktop = { webgpu: true, mobile: false, reducedMotion: false };
@@ -42,5 +49,16 @@ describe("parseTierOverride", () => {
     expect(parseTierOverride("?x=1&tier=ULTRA")).toBe("ultra");
     expect(parseTierOverride("?tier=potato")).toBeNull();
     expect(parseTierOverride("")).toBeNull();
+  });
+});
+
+describe("parseWebGLOverride", () => {
+  it("is true only for ?webgl=1", () => {
+    expect(parseWebGLOverride("?webgl=1")).toBe(true);
+    expect(parseWebGLOverride("?tier=low&webgl=1")).toBe(true);
+    expect(parseWebGLOverride("?webgl=0")).toBe(false);
+    expect(parseWebGLOverride("?webgl=true")).toBe(false);
+    expect(parseWebGLOverride("?tier=low")).toBe(false);
+    expect(parseWebGLOverride("")).toBe(false);
   });
 });

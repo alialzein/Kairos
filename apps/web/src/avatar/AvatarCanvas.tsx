@@ -7,7 +7,13 @@ import { TIERS, type Tier } from "@twin/config";
 import { FrameStats } from "./telemetry/frametime";
 import { bloomParams } from "./post/params";
 import { createPipeline } from "./post/pipeline";
-import { baseTier, parseTierOverride, readSignals, tierFromProbe } from "./tier";
+import {
+  baseTier,
+  parseTierOverride,
+  parseWebGLOverride,
+  readSignals,
+  tierFromProbe,
+} from "./tier";
 import { loadBust } from "./sim/bust";
 import { computeFrame, initialMemory, type FrameMemory } from "./sim/frame";
 import { PALETTE } from "./sim/palette";
@@ -31,6 +37,7 @@ import { useAvatarStore } from "./state/store";
 export interface AvatarCanvasProps {
   /** force a tier (tests, playground); otherwise signals + probe decide */
   tier?: Tier;
+  /** WebGL2 backend instead of WebGPU; when undefined the page's `?webgl=1` decides */
   forceWebGL?: boolean;
   className?: string;
   /** pointer repulsion / long-press attract / click-to-wake */
@@ -41,6 +48,17 @@ export interface AvatarCanvasProps {
 
 const SEED = 20260904;
 const PROBE_S = 2;
+
+/** the slice of GPUDevice the factory reads (no @webgpu/types in the repo) */
+interface LostReporter {
+  lost: Promise<{ reason?: string; message: string }>;
+}
+
+/** renderers we disposed ourselves: their "destroyed" device loss is expected, any other
+ *  "destroyed" came from the browser (CI's SwiftShader does that ~100 ms after creation).
+ *  Nothing disposes the avatar's renderer today — R3F only knows the WebGL renderer's API — so
+ *  this stays empty; it is here so the guard matches SceneCanvas and survives a future lifecycle. */
+const disposedByUs = new WeakSet<object>();
 
 function ParticleSystem({
   targets,
@@ -285,6 +303,15 @@ export function AvatarCanvas({
   const setAberration = useCallback((v: number) => {
     aberration.current = v;
   }, []);
+  // Backend override from the URL when no prop says otherwise (AvatarStage's memoized CanvasLayer
+  // mounts this without one, so `/?webgl=1` and the demo bench page would otherwise still boot
+  // WebGPU). Read once via a dep-less memo — like the tier fallback above — because makeRenderer
+  // must stay referentially stable (canvas-isolation rule, docs/plans/phase-b5-ledger.md Task 7).
+  const urlWebGL = useMemo(
+    () => (typeof window === "undefined" ? false : parseWebGLOverride(window.location.search)),
+    [],
+  );
+  const useWebGL = forceWebGL ?? urlWebGL;
 
   // MUST be referentially stable: R3F re-creates the renderer when the `gl` prop changes, so an
   // inline factory plus any parent re-render (e.g. a page subscribing to the store's frame stats)
@@ -297,14 +324,25 @@ export function AvatarCanvas({
         canvas: props.canvas as HTMLCanvasElement,
         antialias: false,
         powerPreference: "high-performance",
-        forceWebGL: !!forceWebGL,
+        forceWebGL: useWebGL,
       });
       await renderer.init();
       setBackend("isWebGPUBackend" in renderer.backend ? "webgpu" : "webgl");
+      // A lost WebGPU device is otherwise silent (three logs only the non-"destroyed" ones, and
+      // nothing reaches the bench), so the page looks alive while it renders nothing — that is how
+      // the CI baseline came to measure a dead device. Report it the way SceneCanvas does. WebGL
+      // has no `device`, so this is WebGPU-only.
+      const device = (renderer.backend as { device?: LostReporter }).device;
+      void device?.lost.then((info) => {
+        if (info.reason === "destroyed" && disposedByUs.has(renderer)) return;
+        const message = `webgpu device lost: ${info.reason ?? "unknown"} ${info.message}`;
+        console.error(`avatar: ${message}`);
+        useAvatarStore.getState().setError(message);
+      });
       renderer.setClearColor(new Color("#050a18"), 1);
       return renderer;
     },
-    [forceWebGL, setBackend],
+    [useWebGL, setBackend],
   );
 
   // 2. build targets for the tier (once per tier)
@@ -339,7 +377,7 @@ export function AvatarCanvas({
     };
   }, [tier, setTier]);
 
-  // 3. pause when hidden; Low tier renders one second then stops
+  // 3. pause when hidden (a device-chosen Low tier also freezes after a second, above)
   useEffect(() => {
     const onVis = () => setFrameloop(document.hidden ? "never" : "always");
     document.addEventListener("visibilitychange", onVis);
@@ -349,7 +387,11 @@ export function AvatarCanvas({
   const handleReady = useCallback(() => {
     setReady(true);
     onReady?.();
-    if (tier === "low") setTimeout(() => setFrameloop("never"), 1000);
+    // Low renders one second then freezes (docs/06 §7, the reduced-motion gate) — but only when
+    // the tier was chosen for this device. A forced tier is a bench/playground override, like the
+    // probe below, and the CI smoke needs the cheapest page to keep rendering long enough to
+    // sample real frames (software WebGL2 on the runner manages 1-10 fps).
+    if (tier === "low" && !tierProp) setTimeout(() => setFrameloop("never"), 1000);
     // 4. probe: after 2 s, step down once if p95 is over budget (skipped when a tier was forced)
     if (!tierProp && !probed.current && tier && tier !== "low") {
       probed.current = true;

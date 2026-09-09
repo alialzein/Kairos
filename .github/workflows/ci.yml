@@ -95,7 +95,7 @@ jobs:
         run: supabase stop --no-backup
 
   avatar:
-    name: avatar · e2e + frame-time (Playwright, SwiftShader)
+    name: avatar + scene · e2e + frame-time (Playwright, SwiftShader WebGL2)
     runs-on: ubuntu-latest
     env:
       UPDATE_BASELINE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_baseline == true && '1' || '0' }}
