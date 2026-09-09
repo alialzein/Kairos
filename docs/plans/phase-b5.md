@@ -36,7 +36,7 @@ Copied from the specs; every task implicitly includes these.
 | D6 | Public route `/bench/avatar` (canvas only, query-driven) for Playwright perf and E2E; `/dev/avatar` stays owner-only (ruling). | CI has no Supabase session; the bench page exposes nothing private. |
 | D7 | Q6 resolved: the Avatar is always dark; light theme applies to dashboard chrome only. | Ali's answer. |
 | D8 | Pointer repulsion, click-to-wake and long-press attract ship in B5; pinch-zoom and double-tap reset move to Phase B7 (ruling). | Mobile gestures belong with the mobile phase. |
-| D9 | Perf CI runs Chromium on SwiftShader and gates on regression against a committed CI baseline (> 15 % slower p95 fails, per-backend); absolute fps targets are checked by hand on the laptop (desktop) and Ali's phone (gate items). | GitHub runners have no GPU; absolute numbers there mean nothing. |
+| D9 | Perf CI runs Chromium on SwiftShader **WebGL2** (`?webgl=1`; the runner's WebGPU device dies at start, ledger 2026-09-07/09) and gates on regression against a committed CI baseline (> 15 % slower p95 fails, per-backend); absolute fps targets are checked by hand on the laptop (desktop) and Ali's phone (gate items). | GitHub runners have no GPU; absolute numbers there mean nothing. |
 | D10 | No drei; R3F + three only. Leva only inside `/dev/avatar` (ruling). | Fewer moving parts on the WebGPU path. |
 | D11 | Tier = signals → candidate tier → 2 s FPS probe → maybe one step down; `?tier=` overrides; nothing cached (ruling). | Simple and honest on every load. |
 | D12 | Vitest stays node-only; component behaviour is covered by Playwright on `/bench/avatar` (ruling). | Avoids a jsdom + WebGPU mocking layer that would test nothing real. |
@@ -4054,7 +4054,7 @@ gh pr create --fill --title "B5.7 avatar hero + demo turns"
 
 **Interfaces:**
 - Consumes: `window.__twinAvatar.stats` from the bench page.
-- Produces: `baseline.ci.json` shaped `{ "backend": "webgl" | "webgpu", "tier": "mid", "p95": number, "p50": number, "recordedAt": "<iso>", "runner": "ubuntu-latest" }`; CI artifact `avatar-perf` with `test-results/perf.json` on every run.
+- Produces: `baseline.ci.json` shaped (backend is "webgl" on CI since follow-up PR 2, 2026-09-09) `{ "backend": "webgl" | "webgpu", "tier": "mid", "p95": number, "p50": number, "recordedAt": "<iso>", "runner": "ubuntu-latest" }`; CI artifact `avatar-perf` with `test-results/perf.json` on every run.
 
 - [ ] **Step 1: Branch** — `git switch -c b5-09-perf-ci main`
 

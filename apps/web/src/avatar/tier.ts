@@ -44,6 +44,16 @@ export function parseTierOverride(search: string): Tier | null {
   return v && (TIER_ORDER as readonly string[]).includes(v) ? (v as Tier) : null;
 }
 
+/**
+ * `?webgl=1` forces the WebGL2 backend. CI needs it: the runner's SwiftShader WebGPU device is
+ * lost ~100 ms after creation, so nothing renders there (bisect 2026-09-07, see
+ * tests/helpers/benchUrl.ts). Kept as a plain string parser so it is unit-testable like
+ * parseTierOverride and can be read once, client-side, without a window in scope.
+ */
+export function parseWebGLOverride(search: string): boolean {
+  return new URLSearchParams(search).get("webgl") === "1";
+}
+
 /** Browser-only: gather the signals baseTier() needs. Safe to call on any navigator. */
 export function readSignals(nav: Navigator, win: Window): TierSignals {
   const mobile = /Android|iPhone|iPad|Mobile/i.test(nav.userAgent);

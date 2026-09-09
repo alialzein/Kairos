@@ -17,6 +17,8 @@ declare global {
     __twinAvatar?: {
       ready: boolean;
       backend: string | null;
+      /** renderer failure, e.g. a lost WebGPU device — null when healthy */
+      error: string | null;
       tier: Tier | null;
       frames: number;
       stats: { p50: number; p95: number; count: number };
@@ -52,6 +54,7 @@ export function BenchAvatar({
       window.__twinAvatar = {
         ready: s.ready,
         backend: s.backend,
+        error: s.error,
         tier: s.tier,
         frames: frames.current,
         stats: s.frames,

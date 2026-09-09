@@ -37,4 +37,12 @@ describe("useAvatarStore", () => {
     expect(g.frames.p95).toBe(12);
     expect(g.tuning.turbulence).toBe(0.9);
   });
+
+  it("records a renderer error and clears it on reset", () => {
+    expect(useAvatarStore.getState().error).toBeNull();
+    useAvatarStore.getState().setError("webgpu device lost: destroyed");
+    expect(useAvatarStore.getState().error).toBe("webgpu device lost: destroyed");
+    useAvatarStore.getState().reset();
+    expect(useAvatarStore.getState().error).toBeNull();
+  });
 });
