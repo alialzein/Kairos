@@ -25,24 +25,14 @@ describe("useAvatarStore", () => {
     expect(useAvatarStore.getState().log.length).toBeLessThanOrEqual(20);
   });
 
-  it("stores energy, pointer, frames and tuning", () => {
+  it("stores energy and the WAKING assembly progress, and reset clears them", () => {
     const s = useAvatarStore.getState();
     s.setEnergy({ bass: 0.1, mid: 0.2, treble: 0.3 });
-    s.setPointer({ x: 0.5, active: true });
-    s.setFrames({ p50: 8, p95: 12, count: 100 });
-    s.setTuning({ turbulence: 0.9 });
-    const g = useAvatarStore.getState();
-    expect(g.energy.mid).toBe(0.2);
-    expect(g.pointer).toMatchObject({ x: 0.5, y: 0, active: true, strength: 1 });
-    expect(g.frames.p95).toBe(12);
-    expect(g.tuning.turbulence).toBe(0.9);
-  });
-
-  it("records a renderer error and clears it on reset", () => {
-    expect(useAvatarStore.getState().error).toBeNull();
-    useAvatarStore.getState().setError("webgpu device lost: destroyed");
-    expect(useAvatarStore.getState().error).toBe("webgpu device lost: destroyed");
+    s.setAssemble(0.4);
+    expect(useAvatarStore.getState().energy.mid).toBe(0.2);
+    expect(useAvatarStore.getState().assemble).toBe(0.4);
     useAvatarStore.getState().reset();
-    expect(useAvatarStore.getState().error).toBeNull();
+    expect(useAvatarStore.getState().energy).toEqual({ bass: 0, mid: 0, treble: 0 });
+    expect(useAvatarStore.getState().assemble).toBe(0);
   });
 });

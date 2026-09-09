@@ -19,6 +19,7 @@ export default async function BenchScenePage({
       state={one(sp.state)}
       demo={one(sp.demo) === "1"}
       hold={one(sp.hold)}
+      stage={one(sp.stage) === "1"}
     />
   );
 }

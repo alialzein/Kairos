@@ -15,7 +15,7 @@ describe("isPublicPath", () => {
   });
 
   it("the avatar bench page is public (docs/plans/phase-b5.md D6)", () => {
-    expect(isPublicPath("/bench/avatar")).toBe(true);
+    expect(isPublicPath("/bench/scene")).toBe(true);
     expect(isPublicPath("/benchmark")).toBe(false);
   });
 });

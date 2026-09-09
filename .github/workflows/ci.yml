@@ -95,7 +95,7 @@ jobs:
         run: supabase stop --no-backup
 
   avatar:
-    name: avatar + scene · e2e + frame-time (Playwright, SwiftShader WebGL2)
+    name: scene · e2e + frame-time (Playwright, SwiftShader WebGL2)
     runs-on: ubuntu-latest
     env:
       UPDATE_BASELINE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_baseline == true && '1' || '0' }}
@@ -105,13 +105,17 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      # the image ships Google's Chrome apt source, which we never install from; when its index
+      # hash mismatches (2026-09-09, three runs in a row) `apt-get update` fails and Playwright's
+      # --with-deps aborts before a single test runs
+      - run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
       - run: pnpm --filter @twin/web exec playwright install --with-deps chromium
       - run: pnpm --filter @twin/web build
       - run: pnpm --filter @twin/web test:e2e
       - if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: avatar-perf
+          name: scene-perf
           path: |
             apps/web/test-results/perf.json
             apps/web/playwright-report
@@ -119,5 +123,5 @@ jobs:
       - if: env.UPDATE_BASELINE == '1'
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: avatar-baseline
+          name: scene-baseline
           path: apps/web/tests/perf/baseline.ci.json

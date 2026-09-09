@@ -540,6 +540,34 @@ prettier; production build + the scene smoke in CI mode 3/3 (boot + keeps render
 `?state=OFFLINE` HUD); `?demo=1` probed for 42 s on the dev server: DORMANT → WAKING → LISTENING →
 THINKING → SPEAKING → IDLE → OFFLINE → IDLE → (loop) at 5 s per state, no page errors.
 
+## Follow-up 3 (Ali, 2026-09-09) — look v2 removed, the owner home is the scene
+
+Branch `b5-34-scene-home`. The owner home (`apps/web/src/app/(owner)/page.tsx`) now renders
+`scene/SceneStage.tsx`: the Neural Bust canvas with its own HUD as the status readout, the two-line
+transcript ribbon, the chat drawer that runs demo turns until the Brain arrives (Phase A2), and
+click-to-wake on the canvas wrapper (WAKE; barge-in while SPEAKING; the 350 ms wake cue). The stage
+keeps the canvas-isolation shape (memoized canvas layer, stable callbacks, a memoized `layers`
+prop) and `useAvatarState` keeps owning the timed transitions. `/bench/scene?stage=1` shows the same
+component without signing in; `&demo=1` there runs one demo turn on ready (the B5.7 e2e).
+
+Removed: the look v2 renderer (`AvatarCanvas`, `AvatarStage`, `StatusRing`, the avatar `Hud`,
+`lines/`, `post/`, the particle `sim/`), `tier.ts`, `/dev/avatar` (Leva playground), `/bench/avatar`
+and the `leva` dependency. Kept: what the scene imports (`sim/{random,noise,bust,sampler}`,
+`telemetry/frametime`, `state/{store,machine}`, `audio/{energy,synth}`) and what the brain hookup
+needs (`useAvatarState`, `demo/driver`, `audio/cue`, the mic path `audio/{analyser,energyMode,
+useEnergyInput}`). The avatar store shrank to state / since / log / energy / assemble.
+
+CI: the perf gate moves from the avatar bench to `/bench/scene` (every layer, LISTENING — the
+shipped profile, recorded in the baseline's new `profile` field), sampling 30 rendered frames;
+`tests/perf/baseline.ci.json` re-recorded on the runner. The avatar smoke and demo specs are
+replaced by `tests/e2e/stage-demo.spec.ts` (demo turn WAKING → THINKING → SPEAKING → IDLE with the
+ribbon and the scene HUD; click-to-wake DORMANT → WAKING → LISTENING) on the light
+`only=background,hud` layer set. Playwright's readiness probe moved to the scene bench.
+
+Stills (`docs/screens/follow-up-3/`, the stage on the bench at 1600×900): `home-dormant.png` (the
+home as it opens: DORMANT, the wake hint in the ribbon, chat toggle top-left, HUD top-right) and
+`home-after-demo-turn.png` (after `?demo=1`: the reply in the ribbon, STATUS: IDLE, dim amber core).
+
 ## Verification (2026-09-06)
 `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, unit tests (27 new in `src/scene`), e2e 5/5 on a
 production build (avatar smoke + demo, scene smoke incl. HUD) on WebGPU; WebGL2 fallback boot

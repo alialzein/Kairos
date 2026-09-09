@@ -123,15 +123,18 @@ On a cloud project, also turn off "Enable email signups" under Authentication �
 owner account exists — `ALLOW_SIGNUP` only gates the app's own `signInWithOtp` call, not the Supabase
 project setting.
 
-## Avatar playground
+## Scene bench (the avatar's tuning page)
 
-`pnpm dev` → sign in → http://localhost:3000/dev/avatar. Left panel: backend, tier and frame times (p50/p95),
-state buttons (one per Avatar State), tier override, energy source (`synth` = fake speech, `file` = pick a
-WAV/MP3, `mic` = browser microphone). Right panel (Leva): live simulation and bloom sliders; `reset` returns
-to the state table. Values you like go into `packages/config/src/avatar.ts` (state table) or
-`apps/web/src/avatar/sim/frame.ts` (`DEFAULTS`) — the playground never persists anything.
-
-Public, no sign-in: http://localhost:3000/bench/avatar?tier=mid&state=SPEAKING (used by the Playwright tests).
+Public, no sign-in: http://localhost:3000/bench/scene. Every knob lives in
+`apps/web/src/scene/sceneConfig.ts`; preview a value for one page load with
+`?set=contours.frequency:40,post.bloomStrength:0.6` (development builds only — production ignores
+`set`). States: `?state=SPEAKING` previews one, Space / ← / → cycle them, `?demo=1` auto-cycles
+DORMANT → WAKING → LISTENING → THINKING → SPEAKING → IDLE → OFFLINE → IDLE at 5 s per state, and
+`?hold=2.5` pins the state clock for a reproducible still. `?stage=1` shows the owner home's stage
+(ribbon, chat drawer, click-to-wake) without signing in; `?stage=1&demo=1` runs one demo turn.
+Layers: `?only=bust,contours` / `?off=post` / `?phase=N`. `window.__twinScene` publishes backend,
+ready, error, frame stats, state and the blended look for scripts. The old `/dev/avatar` playground
+and `/bench/avatar` went with look v2 (follow-up 3, 2026-09-09).
 
 ## Ports
 
@@ -152,9 +155,11 @@ Public, no sign-in: http://localhost:3000/bench/avatar?tier=mid&state=SPEAKING (
 
 ## Avatar performance
 
-CI runs `apps/web/tests/perf/avatar.spec.ts` on SwiftShader WebGL2 (no GPU; `?webgl=1` — the runner's
-WebGPU device dies at start, so the baseline's backend is "webgl") and fails when p95 frame time regresses
-more than 15 % against `tests/perf/baseline.ci.json`. Re-record the baseline only after an intentional cost
-change: Actions → ci → "Run workflow" with `update_baseline` ticked, download the `avatar-baseline` artifact,
-commit it (a re-record runs single-worker on the runner, like every CI run; local runs never write it). Real fps numbers come from `/dev/avatar` on the PC (desktop gate: 60 fps at `ultra`) and on Ali's
-phone (`?tier=mid`, gate: 30 fps).
+CI runs `apps/web/tests/perf/scene.spec.ts` on SwiftShader WebGL2 (no GPU; `?webgl=1` — the runner's
+WebGPU device dies at start, so the baseline's backend is "webgl") against the shipped scene (every
+layer, LISTENING — the `profile` field) and fails when p95 frame time regresses more than 15 % against
+`tests/perf/baseline.ci.json`. Re-record the baseline only after an intentional cost change: Actions → ci →
+"Run workflow" with `update_baseline` ticked, download the `scene-baseline` artifact, commit it (a
+re-record runs single-worker on the runner, like every CI run; local runs never write it). Real fps
+numbers come from `/bench/scene` on the PC (`window.__twinScene.stats`; desktop gate: 60 fps) and on
+Ali's phone (gate: 30 fps; counts halve below `perf.mobileWidth`).
